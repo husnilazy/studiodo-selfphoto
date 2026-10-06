@@ -69,6 +69,8 @@ html[data-theme="dark"] .site{${vars(darkA, darkB)}}
               {online.enabled && <li><Link href="/book" className="hover:text-accent">Booking online</Link></li>}
               <li><a href="/#layanan" className="hover:text-accent">Layanan</a></li>
               <li><a href="/#lokasi" className="hover:text-accent">Lokasi</a></li>
+              <li><Link href="/privasi" className="hover:text-accent">Kebijakan Privasi</Link></li>
+              <li><Link href="/syarat" className="hover:text-accent">Syarat Layanan</Link></li>
               <li><Link href="/login" className="inline-flex items-center gap-1 text-muted hover:text-fg"><Icon name="lock" className="size-3.5" /> Masuk staf</Link></li>
             </ul>
           </div>

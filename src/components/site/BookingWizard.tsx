@@ -272,7 +272,10 @@ export default function BookingWizard({
           )}
         </div>
       </div>
-      <p className="mt-10 text-center text-xs text-muted">Dengan mengirim booking, Anda setuju dihubungi {studioName} lewat WhatsApp terkait pesanan ini.</p>
+      <p className="mt-10 text-center text-xs text-muted">
+        Dengan mengirim booking, Anda setuju dihubungi {studioName} lewat WhatsApp terkait pesanan ini serta menyetujui{" "}
+        <Link href="/syarat" className="font-semibold underline">Syarat Layanan</Link> dan <Link href="/privasi" className="font-semibold underline">Kebijakan Privasi</Link>.
+      </p>
     </div>
   );
 }
