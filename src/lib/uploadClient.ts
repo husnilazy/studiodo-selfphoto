@@ -1,8 +1,9 @@
 "use client";
 import { prepareMediaUpload } from "@/app/actions/website";
+import { prepareStudioUpload } from "@/app/actions/studio";
 
 /** Perkecil gambar besar (maks 1800px, WebP) sebelum diunggah agar cepat dimuat di website. */
-export async function shrinkImage(file: File, max = 1800): Promise<File> {
+export async function shrinkImage(file: File, max = 1800, quality = 0.86): Promise<File> {
   if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return file;
   try {
     const bmp = await createImageBitmap(file);
@@ -11,15 +12,15 @@ export async function shrinkImage(file: File, max = 1800): Promise<File> {
     const c = document.createElement("canvas");
     c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
     c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
-    const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", 0.86));
+    const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", quality));
     if (!blob || blob.size >= file.size) return file;
     return new File([blob], file.name.replace(/\.\w+$/, "") + ".webp", { type: "image/webp" });
   } catch { return file; }
 }
 
 /** Unggah satu file ke Supabase Storage (URL bertanda tangan) dan kembalikan URL publiknya. */
-export async function uploadToStorage(file: File, onPct?: (n: number) => void): Promise<{ url?: string; error?: string }> {
-  const p = await prepareMediaUpload(file.name, file.type, file.size);
+export async function uploadToStorage(file: File, onPct?: (n: number) => void, studio = false): Promise<{ url?: string; error?: string }> {
+  const p = await (studio ? prepareStudioUpload : prepareMediaUpload)(file.name, file.type, file.size);
   if (!p.ok) return { error: p.error };
   const fd = new FormData();
   fd.append("cacheControl", "31536000");

@@ -1,7 +1,7 @@
 // Skema database STUDIODO Kasir (PostgreSQL / Supabase). Idempotent: aman dijalankan berulang.
 // Semua nilai uang disimpan sebagai bigint rupiah (tanpa desimal).
 // NAIKKAN versi ini setiap kali SCHEMA diubah agar database yang sudah ada ikut ter-upgrade.
-export const SCHEMA_VERSION = "2026-10-07.5";
+export const SCHEMA_VERSION = "2026-10-08.1";
 
 export const SCHEMA = `
 create table if not exists users (
@@ -309,6 +309,49 @@ alter table bookings add column if not exists discount_detail jsonb not null def
 alter table customers add column if not exists is_member boolean not null default false;
 alter table customers add column if not exists member_no text not null default '';
 alter table customers add column if not exists member_since date;
+
+-- Studio Foto: frame photobooth, desain (feed/carousel/cetak), dan file hasil ekspor
+create table if not exists frames (
+  id serial primary key,
+  name text not null,
+  category text not null default 'lainnya',
+  url text not null,
+  w int not null,
+  h int not null,
+  slots jsonb not null default '[]',
+  active boolean not null default true,
+  created_by int references users(id),
+  created_at timestamptz not null default now()
+);
+alter table frames enable row level security;
+create table if not exists designs (
+  id serial primary key,
+  name text not null default 'Desain tanpa judul',
+  kind text not null default 'feed',
+  data jsonb not null default '{}',
+  thumb_url text not null default '',
+  status text not null default 'draf',
+  caption text not null default '',
+  tags text not null default '',
+  customer_id int references customers(id) on delete set null,
+  created_by int references users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table designs enable row level security;
+create table if not exists design_exports (
+  id serial primary key,
+  design_id int references designs(id) on delete set null,
+  name text not null,
+  url text not null,
+  w int not null default 0,
+  h int not null default 0,
+  format text not null default 'png',
+  size_bytes bigint not null default 0,
+  created_by int references users(id),
+  created_at timestamptz not null default now()
+);
+alter table design_exports enable row level security;
 
 -- Monitoring sesi live
 alter table bookings add column if not exists started_at timestamptz;

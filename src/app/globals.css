@@ -274,3 +274,7 @@ html.theming, html.theming *, html.theming *::before, html.theming *::after { tr
   .card-face:last-child { break-after: auto; page-break-after: auto; }
   .card-face .mcard { border-radius: 0 !important; box-shadow: none !important; width: 102mm; height: 76mm; aspect-ratio: auto; }
 }
+
+/* Editor foto */
+.editor-checker { background-color: color-mix(in oklab, var(--panel-2) 80%, var(--bg)); background-image: conic-gradient(color-mix(in oklab, var(--fg) 7%, transparent) 25%, transparent 0 50%, color-mix(in oklab, var(--fg) 7%, transparent) 0 75%, transparent 0); background-size: 18px 18px; }
+@media print { .editor-root { display: none !important; } }

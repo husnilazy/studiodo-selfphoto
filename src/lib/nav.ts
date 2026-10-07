@@ -7,6 +7,7 @@ export const NAV: Item[] = [
   { href: "/booking", label: "Booking", icon: "calendar", roles: ["owner", "admin", "kasir"] },
   { href: "/customer", label: "Customer", icon: "users", roles: ["owner", "admin", "kasir"] },
   { href: "/file", label: "File Customer", icon: "folder", roles: ["owner", "admin", "kasir"] },
+  { href: "/studio", label: "Studio Foto", icon: "camera", roles: ["owner", "admin", "kasir"] },
   { href: "/website", label: "Website", icon: "layout", roles: ["owner", "admin"] },
   { href: "/paket", label: "Paket & Ruang", icon: "box", roles: ["owner", "admin"] },
   { href: "/promo", label: "Promo & Voucher", icon: "tag", roles: ["owner", "admin"] },

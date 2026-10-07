@@ -143,7 +143,7 @@ export function sanitizeSite(input: unknown): SiteConfig {
 /* ───────── Media ───────── */
 export type MediaKind = "video" | "youtube" | "drive" | "instagram" | "tiktok" | "image" | "empty";
 
-const driveId = (u: string) => /drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([\w-]{10,})/.exec(u)?.[1] ?? null;
+export const driveId = (u: string) => /drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([\w-]{10,})/.exec(u)?.[1] ?? null;
 export const youtubeId = (u: string) => /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/))([\w-]{11})/.exec(u)?.[1] ?? null;
 
 export function mediaKind(u: string): MediaKind {

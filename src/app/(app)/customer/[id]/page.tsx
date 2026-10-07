@@ -46,6 +46,7 @@ export default async function CustomerDetail({ params }: { params: Promise<{ id:
           <Sheet title="Edit Customer" trigger={<button className="btn btn-sm"><Icon name="edit" className="size-4" /> Edit</button>}>
             <CustomerForm customer={c} canDelete={user.role !== "kasir"} />
           </Sheet>
+          <Link href={`/editor/baru?customer=${c.id}`} className="btn btn-sm"><Icon name="camera" className="size-4" /> Edit Foto</Link>
           <Link href={`/booking/baru?customer=${c.id}`} className="btn btn-primary btn-sm"><Icon name="plus" className="size-4" /> Transaksi</Link>
         </>} />
 
