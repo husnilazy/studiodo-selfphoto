@@ -22,7 +22,7 @@ export default function SiteNav({
 }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const links = ALL.filter((l) => sections.includes(l.key));
+  const links = [...ALL.filter((l) => sections.includes(l.key)), { href: "/anggota", label: "Member", key: "member" }];
 
   useEffect(() => {
     const on = () => setScrolled(window.scrollY > 12);

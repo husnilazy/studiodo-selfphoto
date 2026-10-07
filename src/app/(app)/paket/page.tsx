@@ -7,6 +7,7 @@ import { q } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { storageReady } from "@/lib/siteServer";
 import PackageImageEditor from "@/components/PackageImageEditor";
+import ImageUploadField from "@/components/ImageUploadField";
 import { CATEGORY_LABEL, rupiah } from "@/lib/format";
 import { imageStyle, priceSuffix } from "@/lib/packageUtils";
 import { imageSrc } from "@/lib/siteConfig";
@@ -77,7 +78,7 @@ export default async function PaketPage({ searchParams }: { searchParams: Promis
         <section>
           <div className="mb-4 flex justify-end">
             <Sheet title="Ruang Baru" trigger={<button className="btn btn-primary"><Icon name="plus" className="size-4" /> Tambah Ruang</button>}>
-              <RoomForm />
+              <RoomForm storage={storage} />
             </Sheet>
           </div>
           {rooms.length === 0 ? <Empty title="Belum ada ruang" hint="Satu ruang = satu set/background yang dipakai bergantian. Jadwal tidak boleh bentrok di ruang yang sama." /> : (
@@ -85,13 +86,16 @@ export default async function PaketPage({ searchParams }: { searchParams: Promis
               {rooms.map((r) => (
                 <Sheet key={r.id} title="Edit Ruang" trigger={
                   <button className={`card anim-rise flex items-center gap-3 p-4 text-left transition active:scale-[.98] ${r.active ? "" : "opacity-55"}`}>
-                    <span className="size-10 shrink-0 rounded-xl" style={{ background: r.color }} />
+                    {r.image_url
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={imageSrc(r.image_url)} alt="" loading="lazy" className="size-10 shrink-0 rounded-xl object-cover ring-2" style={{ ["--tw-ring-color" as string]: r.color }} />
+                      : <span className="size-10 shrink-0 rounded-xl" style={{ background: r.color }} />}
                     <span className="min-w-0">
                       <span className="block truncate font-semibold">{r.name}</span>
                       <span className="block truncate text-xs text-muted">{r.description || (r.active ? "Aktif" : "Nonaktif")}</span>
                     </span>
                   </button>}>
-                  <RoomForm room={r} />
+                  <RoomForm room={r} storage={storage} />
                 </Sheet>
               ))}
             </div>
@@ -192,14 +196,14 @@ function PackageForm({ pkg, rooms, storage }: { pkg?: Pkg; rooms: Room[]; storag
   );
 }
 
-function RoomForm({ room }: { room?: Room }) {
+function RoomForm({ room, storage }: { room?: Room; storage: boolean }) {
   return (
     <>
       <ActionForm action={saveRoom.bind(null, room?.id ?? null)}>
         <Field label="Nama ruang / background"><input name="name" className="input" required defaultValue={room?.name} placeholder="mis. Studio A – Putih Polos" /></Field>
         <Field label="Warna penanda di jadwal"><input name="color" type="color" className="input !p-1" defaultValue={room?.color ?? "#4f4fe8"} /></Field>
         <Field label="Keterangan (tampil di website)"><input name="description" className="input" defaultValue={room?.description} /></Field>
-        <Field label="Link foto contoh (opsional)" hint="Tempel link gambar (https://…) agar customer bisa melihat background ini."><input name="image_url" type="url" className="input" defaultValue={room?.image_url} /></Field>
+        <ImageUploadField name="image_url" defaultValue={room?.image_url} storage={storage} label="Foto contoh background (tampil di website)" />
         <ActiveToggle on={room?.active ?? true} />
       </ActionForm>
       {room && <DeleteRow table="rooms" id={room.id} />}

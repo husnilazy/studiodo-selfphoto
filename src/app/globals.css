@@ -261,3 +261,16 @@ html.theming, html.theming *, html.theming *::before, html.theming *::after { tr
 @keyframes deal-shine { to { background-position: -200% 0; } }
 .deal-strip { background: linear-gradient(100deg, #e11d48, #f97316 45%, #e11d48); background-size: 200% 100%; animation: deal-shine 6s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .cd-tick, .ribbon, .deal-strip { animation: none; } }
+
+/* Cetak kartu member: halaman bernama 4R/2 (102 × 76 mm), hanya kartu yang tercetak */
+@page membercard { size: 102mm 76mm; margin: 0; }
+@media print {
+  body:has(.card-sheet) { background: #fff !important; }
+  body:has(.card-sheet) aside, body:has(.card-sheet) nav { display: none !important; }
+  body:has(.card-sheet) .lg\:pl-64 { padding-left: 0 !important; }
+  body:has(.card-sheet) main { padding: 0 !important; max-width: none !important; margin: 0 !important; }
+  .card-sheet { page: membercard; display: block !important; margin: 0 !important; }
+  .card-face { width: 102mm !important; height: 76mm; break-after: page; page-break-after: always; }
+  .card-face:last-child { break-after: auto; page-break-after: auto; }
+  .card-face .mcard { border-radius: 0 !important; box-shadow: none !important; width: 102mm; height: 76mm; aspect-ratio: auto; }
+}

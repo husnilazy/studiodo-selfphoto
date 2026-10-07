@@ -9,7 +9,8 @@ import { requireUser } from "@/lib/auth";
 import { dateWIB, fmtDate, rupiah, waLink } from "@/lib/format";
 import { isMemberNow, nextIsReward, tierFor, visitsToReward } from "@/lib/pricing";
 import { getMemberCfg } from "@/lib/pricingServer";
-import { joinMember, saveMemberCfg, setMember } from "@/app/actions/member";
+import { joinMember, saveMemberCfg, saveMemberPage, setMember } from "@/app/actions/member";
+import { getMemberPage, materializeAutoMembers } from "@/lib/memberServer";
 
 export const metadata = { title: "Member" };
 
@@ -18,9 +19,11 @@ type M = { id: number; name: string; phone: string; is_member: boolean; member_n
 export default async function MemberPage({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string }> }) {
   await requireUser(["owner", "admin"]);
   const sp = await searchParams;
-  const tab = sp.tab === "atur" ? "atur" : "member";
+  const tab = sp.tab === "atur" ? "atur" : sp.tab === "info" ? "info" : "member";
   const cfg = await getMemberCfg();
   const term = (sp.q ?? "").trim();
+  if (tab === "member") await materializeAutoMembers(cfg.auto_join_visits);
+  const mpage = tab === "info" ? await getMemberPage() : null;
   const rows = tab === "member" ? await q<M>(
     `select c.id, c.name, c.phone, c.is_member, c.member_no, c.member_since,
             count(b.id) filter (where b.status = 'done')::int as visits,
@@ -37,10 +40,12 @@ export default async function MemberPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader title="Member STUDIODO" subtitle="Pelanggan setia otomatis dapat diskon, dan hadiah di kunjungan tertentu." />
+      <PageHeader title="Member STUDIODO" subtitle="Pelanggan setia otomatis dapat diskon, dan hadiah di kunjungan tertentu."
+        actions={<Link href="/anggota" target="_blank" className="btn btn-sm"><Icon name="external" className="size-4" /> Lihat halaman member</Link>} />
       <Tabs active={tab} items={[
         { key: "member", label: "Daftar Member", href: "/member?tab=member" },
         { key: "atur", label: "Aturan & Tingkat", href: "/member?tab=atur" },
+        { key: "info", label: "Halaman Member", href: "/member?tab=info" },
       ]} />
       {!cfg.enabled && <p className="mb-4 rounded-xl bg-warnsoft px-4 py-3 text-sm font-semibold text-warn">Program member sedang dimatikan — diskon member tidak berlaku. Aktifkan di tab “Aturan & Tingkat”.</p>}
 
@@ -98,6 +103,7 @@ export default async function MemberPage({ searchParams }: { searchParams: Promi
                     <div className="mt-3 flex gap-2">
                       {m.phone && <a className="btn btn-sm flex-1" target="_blank" rel="noopener noreferrer" href={waLink(m.phone, `Halo ${m.name}, `)}><Icon name="chat" className="size-4" /> WA</a>}
                       <Link className="btn btn-sm flex-1" href={`/booking/baru?customer=${m.id}`}><Icon name="plus" className="size-4" /> Transaksi</Link>
+                      {m.member_no && <Link className="btn btn-sm flex-1" href={`/member/${m.id}/kartu`}><Icon name="printer" className="size-4" /> Kartu</Link>}
                       {m.is_member && <ActionButton action={setMember.bind(null, m.id, false)} confirm={`Keluarkan ${m.name} dari member?`} className="btn btn-sm btn-danger" label="Keluarkan" />}
                     </div>
                   </div>
@@ -140,6 +146,35 @@ export default async function MemberPage({ searchParams }: { searchParams: Promi
             <Field label="Daftar member otomatis setelah N kunjungan (0 = manual saja)" hint="Customer yang sudah N kali datang langsung dianggap member tanpa perlu didaftarkan.">
               <input name="auto_join_visits" inputMode="numeric" className="input" defaultValue={cfg.auto_join_visits} />
             </Field>
+          </ActionForm>
+        </section>
+      )}
+      {tab === "info" && mpage && (
+        <section className="max-w-2xl">
+          <ActionForm action={saveMemberPage} className="card space-y-5 p-4 sm:p-5">
+            <p className="text-sm text-muted">Isi halaman <b>/anggota</b> yang dilihat member setelah login (nomor WhatsApp + kode member). Kartu digital, stempel, voucher pribadi, dan promo berjalan tampil otomatis.</p>
+            <Field label="Kalimat sambutan"><textarea name="intro" className="input" defaultValue={mpage.intro} /></Field>
+            <Field label="Keuntungan member" hint="Satu per baris."><textarea name="perks" className="input !min-h-28" defaultValue={mpage.perks.join("\n")} /></Field>
+            <div>
+              <p className="font-display mb-1 font-semibold">Info &amp; pengumuman</p>
+              <p className="mb-3 text-xs text-muted">Kabar menarik khusus member: event, promo spesial, jadwal libur, dll. Kosongkan judul untuk menghapus.</p>
+              <div className="space-y-3">
+                {Array.from({ length: 6 }).map((_, i) => {
+                  const p = mpage.posts[i];
+                  return (
+                    <div key={i} className="space-y-2 rounded-2xl border border-line bg-panel2/40 p-3">
+                      <input name={`post_title_${i}`} className="input" defaultValue={p?.title} placeholder={`Judul info ${i + 1}`} />
+                      <textarea name={`post_body_${i}`} className="input !min-h-16" defaultValue={p?.body} placeholder="Isi singkat" />
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <input name={`post_link_${i}`} className="input" defaultValue={p?.link} placeholder="Link (opsional)" />
+                        <input name={`post_label_${i}`} className="input" defaultValue={p?.link_label} placeholder="Teks tombol" />
+                        <input name={`post_until_${i}`} type="date" className="input" defaultValue={p?.until} title="Tampil sampai tanggal" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </ActionForm>
         </section>
       )}

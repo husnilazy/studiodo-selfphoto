@@ -74,3 +74,6 @@ export const hasUsers = async () => ((await q("select 1 from users limit 1")).le
 /** Tanda tangan singkat untuk tautan publik (mis. halaman konfirmasi booking online). */
 export const signToken = (v: string) => sign(`pub:${v}`).slice(0, 22);
 export const checkToken = (v: string, t: string) => t.length > 0 && t === signToken(v);
+
+/** Tanda tangan HMAC umum (cookie area member memakai ini). */
+export const signValue = (v: string) => sign(v);

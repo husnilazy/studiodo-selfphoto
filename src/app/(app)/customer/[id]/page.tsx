@@ -42,6 +42,7 @@ export default async function CustomerDetail({ params }: { params: Promise<{ id:
         actions={<>
           {c.phone && <a className="btn btn-sm" target="_blank" rel="noopener noreferrer" href={waLink(c.phone, `Halo ${c.name}, `)}><Icon name="chat" className="size-4" /> WhatsApp</a>}
           {user.role !== "kasir" && <ActionButton action={setMember.bind(null, c.id, !c.is_member)} className="btn btn-sm" confirm={c.is_member ? `Keluarkan ${c.name} dari member?` : undefined}><Icon name="star" className="size-4" /> {c.is_member ? "Member ✓" : "Jadikan Member"}</ActionButton>}
+          {c.is_member && c.member_no && user.role !== "kasir" && <Link href={`/member/${c.id}/kartu`} className="btn btn-sm"><Icon name="printer" className="size-4" /> Kartu Member</Link>}
           <Sheet title="Edit Customer" trigger={<button className="btn btn-sm"><Icon name="edit" className="size-4" /> Edit</button>}>
             <CustomerForm customer={c} canDelete={user.role !== "kasir"} />
           </Sheet>

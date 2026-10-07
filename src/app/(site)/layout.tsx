@@ -67,6 +67,7 @@ html[data-theme="dark"] .site{${vars(darkA, darkB)}}
             <p className="mb-3 text-xs font-bold uppercase tracking-[.18em] text-muted">Jelajahi</p>
             <ul className="space-y-2 text-sm font-semibold">
               {online.enabled && <li><Link href="/book" className="hover:text-accent">Booking online</Link></li>}
+              <li><Link href="/anggota" className="hover:text-accent">Area Member</Link></li>
               <li><a href="/#layanan" className="hover:text-accent">Layanan</a></li>
               <li><a href="/#lokasi" className="hover:text-accent">Lokasi</a></li>
               <li><Link href="/privasi" className="hover:text-accent">Kebijakan Privasi</Link></li>

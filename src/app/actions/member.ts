@@ -4,6 +4,7 @@ import { q } from "@/lib/db";
 import { actionUser } from "@/lib/auth";
 import { bool, int, safe, str } from "@/lib/action";
 import { sanitizeMember } from "@/lib/pricing";
+import { sanitizePage } from "@/lib/memberPage";
 import type { ActionState } from "@/components/ActionForm";
 
 export async function saveMemberCfg(_p: ActionState, fd: FormData) {
@@ -57,5 +58,19 @@ export async function setMember(customerId: number, on: boolean, _p: ActionState
     revalidatePath("/member");
     revalidatePath(`/customer/${customerId}`);
     revalidatePath("/customer");
+  });
+}
+
+export async function saveMemberPage(_p: ActionState, fd: FormData) {
+  return safe(async () => {
+    await actionUser(["owner", "admin"]);
+    const posts = [];
+    for (let i = 0; i < 6; i++) {
+      posts.push({ title: str(fd, `post_title_${i}`), body: str(fd, `post_body_${i}`), link: str(fd, `post_link_${i}`), link_label: str(fd, `post_label_${i}`), until: str(fd, `post_until_${i}`) });
+    }
+    const page = sanitizePage({ intro: str(fd, "intro"), perks: String(fd.get("perks") ?? "").split(/\r?\n/), posts });
+    await q("insert into settings (key, value) values ('member_page', $1::jsonb) on conflict (key) do update set value = excluded.value", [JSON.stringify(page)]);
+    revalidatePath("/member");
+    revalidatePath("/anggota");
   });
 }
