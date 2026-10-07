@@ -1,11 +1,26 @@
-import { imageSrc } from "@/lib/siteConfig";
+import { FONT_FAMILY, imageSrc, type FontKey } from "@/lib/siteConfig";
 
-/** Logo studio (gambar jika ada, selain itu nama bergaya). Mendukung logo terpisah untuk mode gelap. */
+/**
+ * Logo studio. Logo gambar (jika ada) + teks brand tambahan yang bisa diatur dari CMS
+ * (isi, ukuran, dan font). Tanpa logo gambar, nama studio tampil sebagai wordmark.
+ */
 export default function BrandMark({
-  name, logo, logoDark, height = 32, showName = true, className = "",
-}: { name: string; logo: string; logoDark: string; height?: number; showName?: boolean; className?: string }) {
+  name, logo, logoDark, height = 32, text = "", textSize = 16, textFont = "sora", className = "",
+}: {
+  name: string; logo: string; logoDark: string; height?: number;
+  text?: string; textSize?: number; textFont?: FontKey; className?: string;
+}) {
+  const extra = text ? (
+    <span className="whitespace-nowrap font-semibold leading-none tracking-tight" style={{ fontSize: textSize, fontFamily: FONT_FAMILY[textFont] }}>{text}</span>
+  ) : null;
+
   if (!logo && !logoDark) {
-    return <span className={`font-display text-xl font-bold tracking-tight ${className}`}>{name.length <= 10 ? <>{name.slice(0, -2)}<span className="text-accent">{name.slice(-2)}</span></> : name}</span>;
+    return (
+      <span className={`inline-flex items-center gap-2.5 ${className}`}>
+        <span className="font-display text-xl font-bold tracking-tight">{name.length <= 10 ? <>{name.slice(0, -2)}<span className="text-accent">{name.slice(-2)}</span></> : name}</span>
+        {extra}
+      </span>
+    );
   }
   return (
     <span className={`inline-flex items-center gap-2.5 ${logoDark ? "has-dark-logo" : ""} ${className}`}>
@@ -15,7 +30,7 @@ export default function BrandMark({
         // eslint-disable-next-line @next/next/no-img-element
         <img src={imageSrc(logoDark)} alt={name} style={{ height }} className="logo-d w-auto object-contain" />
       )}
-      {showName && <span className="font-display text-lg font-bold tracking-tight">{name}</span>}
+      {extra}
     </span>
   );
 }

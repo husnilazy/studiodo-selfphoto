@@ -1,5 +1,16 @@
 // Konfigurasi konten website (CMS). Aman dipakai di server & client.
 
+export const FONT_OPTIONS = [
+  ["sora", "Sora (bawaan)"], ["jakarta", "Plus Jakarta Sans"], ["playfair", "Playfair Display (elegan)"],
+  ["space", "Space Grotesk (modern)"], ["bebas", "Bebas Neue (kapital tebal)"], ["caveat", "Caveat (tulisan tangan)"],
+] as const;
+export type FontKey = (typeof FONT_OPTIONS)[number][0];
+export const FONT_FAMILY: Record<FontKey, string> = {
+  sora: "var(--font-sora), system-ui, sans-serif", jakarta: "var(--font-jakarta), system-ui, sans-serif",
+  playfair: "var(--font-playfair), Georgia, serif", space: "var(--font-space), system-ui, sans-serif",
+  bebas: "var(--font-bebas), Impact, sans-serif", caveat: "var(--font-caveat), cursive",
+};
+
 export type SectionKey = "reels" | "layanan" | "background" | "gallery" | "cara" | "testimoni" | "lokasi" | "faq" | "cta";
 export const SECTION_LABEL: Record<SectionKey, string> = {
   reels: "Reels & Video", layanan: "Layanan & Harga", background: "Background & Tema", gallery: "Galeri Foto",
@@ -9,7 +20,7 @@ export const SECTION_KEYS = Object.keys(SECTION_LABEL) as SectionKey[];
 
 export type Heading = { enabled: boolean; eyebrow: string; title: string; subtitle: string };
 export type SiteConfig = {
-  brand: { logo_url: string; logo_dark_url: string; favicon_url: string; logo_height: number; show_name: boolean; accent: string; accent2: string };
+  brand: { logo_url: string; logo_dark_url: string; favicon_url: string; logo_height: number; show_name: boolean; text: string; text_size: number; text_font: FontKey; accent: string; accent2: string };
   announce: { enabled: boolean; text: string; link: string; link_label: string };
   hero: {
     badge: string; title: string; highlight: string; subtitle: string; cta1: string; cta2: string;
@@ -34,7 +45,7 @@ export type SiteConfig = {
 const H = (eyebrow: string, title: string, subtitle = ""): Heading => ({ enabled: true, eyebrow, title, subtitle });
 
 export const DEFAULT_SITE: SiteConfig = {
-  brand: { logo_url: "", logo_dark_url: "", favicon_url: "", logo_height: 32, show_name: true, accent: "#4f4fe8", accent2: "#a78bfa" },
+  brand: { logo_url: "", logo_dark_url: "", favicon_url: "", logo_height: 32, show_name: true, text: "", text_size: 16, text_font: "sora", accent: "#4f4fe8", accent2: "#a78bfa" },
   announce: { enabled: false, text: "Promo spesial minggu ini — booking online sekarang!", link: "/book", link_label: "Booking" },
   hero: {
     badge: "Slot hari ini masih tersedia", title: "Abadikan momen,", highlight: "tanpa ribet.", subtitle: "",
@@ -91,6 +102,7 @@ export function sanitizeSite(input: unknown): SiteConfig {
     brand: {
       logo_url: url(b.logo_url), logo_dark_url: url(b.logo_dark_url), favicon_url: url(b.favicon_url),
       logo_height: num(b.logo_height, 18, 72, D.brand.logo_height), show_name: bool(b.show_name, D.brand.show_name),
+      text: str(b.text, 40), text_size: num(b.text_size, 10, 40, D.brand.text_size), text_font: pick(b.text_font, FONT_OPTIONS.map((f) => f[0]), D.brand.text_font),
       accent: color(b.accent, D.brand.accent), accent2: color(b.accent2, D.brand.accent2),
     },
     announce: { enabled: bool(a.enabled, false), text: str(a.text, 200, D.announce.text), link: url(a.link, D.announce.link), link_label: str(a.link_label, 30, D.announce.link_label) },

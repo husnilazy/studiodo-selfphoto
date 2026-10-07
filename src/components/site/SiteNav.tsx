@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import Icon from "../Icon";
 import BrandMark from "./BrandMark";
+import type { FontKey } from "@/lib/siteConfig";
 
 const ALL = [
   { href: "/#layanan", label: "Layanan", key: "layanan" },
@@ -14,9 +15,9 @@ const ALL = [
 ];
 
 export default function SiteNav({
-  name, bookingOpen, logo, logoDark, logoHeight, showName, announce, sections,
+  name, bookingOpen, logo, logoDark, logoHeight, text, textSize, textFont, announce, sections,
 }: {
-  name: string; bookingOpen: boolean; logo: string; logoDark: string; logoHeight: number; showName: boolean;
+  name: string; bookingOpen: boolean; logo: string; logoDark: string; logoHeight: number; text: string; textSize: number; textFont: FontKey;
   announce: { enabled: boolean; text: string; link: string; link_label: string }; sections: string[];
 }) {
   const [scrolled, setScrolled] = useState(false);
@@ -49,7 +50,7 @@ export default function SiteNav({
           </div>
         )}
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" onClick={() => setOpen(false)}><BrandMark name={name} logo={logo} logoDark={logoDark} height={logoHeight} showName={showName} /></Link>
+          <Link href="/" onClick={() => setOpen(false)}><BrandMark name={name} logo={logo} logoDark={logoDark} height={logoHeight} text={text} textSize={textSize} textFont={textFont} /></Link>
           <nav className="hidden items-center gap-7 md:flex">
             {links.map((l) => <a key={l.href} href={l.href} className="text-sm font-semibold text-muted transition-colors hover:text-fg">{l.label}</a>)}
           </nav>

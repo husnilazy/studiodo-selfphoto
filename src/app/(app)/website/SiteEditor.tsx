@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { prepareMediaUpload, saveSite } from "@/app/actions/website";
-import { SECTION_LABEL, imageSrc, mediaKind, type Heading, type SectionKey, type SiteConfig } from "@/lib/siteConfig";
+import { FONT_FAMILY, FONT_OPTIONS, SECTION_LABEL, imageSrc, mediaKind, type Heading, type SectionKey, type SiteConfig } from "@/lib/siteConfig";
 
 type Upd = (fn: (d: SiteConfig) => void) => void;
 const TABS = [
@@ -201,9 +201,32 @@ function Brand({ cfg, upd, storage }: { cfg: SiteConfig; upd: Upd; storage: bool
           <div>
             <span className="label">Tinggi logo: {b.logo_height}px</span>
             <input type="range" min={18} max={72} value={b.logo_height} onChange={(e) => upd((d) => { d.brand.logo_height = Number(e.target.value); })} className="w-full accent-[var(--accent)]" />
-            <div className="mt-3"><Toggle label="Tampilkan nama studio di samping logo" value={b.show_name} onChange={(v) => upd((d) => { d.brand.show_name = v; })} /></div>
-          </div>
+            </div>
         </Grid>
+      </Card>
+      <Card title="Teks brand di samping logo" hint="Teks tambahan setelah logo, mis. “Self Photo Studio”. Kosongkan jika logo sudah cukup.">
+        <Txt label="Teks" value={b.text} onChange={(v) => upd((d) => { d.brand.text = v; })} placeholder="Self Photo Studio" />
+        <Grid>
+          <div>
+            <span className="label">Ukuran teks: {b.text_size}px</span>
+            <input type="range" min={10} max={40} value={b.text_size} onChange={(e) => upd((d) => { d.brand.text_size = Number(e.target.value); })} className="w-full accent-[var(--accent)]" />
+          </div>
+          <label className="block"><span className="label">Font</span>
+            <select className="input" value={b.text_font} onChange={(e) => upd((d) => { d.brand.text_font = e.target.value as typeof b.text_font; })}>
+              {FONT_OPTIONS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+          </label>
+        </Grid>
+        <div className="rounded-2xl border border-line bg-panel2/60 p-4">
+          <span className="label">Pratinjau</span>
+          <div className="mt-2 flex items-center gap-2.5">
+            {b.logo_url
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={imageSrc(b.logo_url)} alt="" style={{ height: b.logo_height }} className="w-auto object-contain" />
+              : <span className="font-display text-xl font-bold">STUDIO<span className="text-accent">DO</span></span>}
+            {b.text && <span className="whitespace-nowrap font-semibold leading-none tracking-tight" style={{ fontSize: b.text_size, fontFamily: FONT_FAMILY[b.text_font] }}>{b.text}</span>}
+          </div>
+        </div>
       </Card>
       <Card title="Warna brand" hint="Mengubah tombol, aksen, dan gradien di seluruh website.">
         <div className="flex flex-wrap gap-2">

@@ -46,13 +46,13 @@ html[data-theme="dark"] .site{${vars(darkA, darkB)}}
   return (
     <div className="site min-h-dvh">
       <style dangerouslySetInnerHTML={{ __html: css }} />
-      <SiteNav name={studio.name} bookingOpen={online.enabled} logo={b.logo_url} logoDark={b.logo_dark_url} logoHeight={b.logo_height} showName={b.show_name}
+      <SiteNav name={studio.name} bookingOpen={online.enabled} logo={b.logo_url} logoDark={b.logo_dark_url} logoHeight={b.logo_height} text={b.text} textSize={b.text_size} textFont={b.text_font}
         announce={site.announce} sections={navSections} />
       {children}
       <footer className="border-t border-line/70 px-4 py-12 sm:px-6">
         <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-[1.4fr_1fr_1fr]">
           <div>
-            <BrandMark name={studio.name} logo={b.logo_url} logoDark={b.logo_dark_url} height={b.logo_height} showName={b.show_name} />
+            <BrandMark name={studio.name} logo={b.logo_url} logoDark={b.logo_dark_url} height={b.logo_height} text={b.text} textSize={b.text_size} textFont={b.text_font} />
             {f.about && <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted">{f.about}</p>}
           </div>
           <div>
