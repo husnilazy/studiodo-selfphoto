@@ -102,6 +102,26 @@ function HeadingFields({ h, onChange }: { h: Heading; onChange: (fn: (h: Heading
   );
 }
 
+/** Unggah satu file ke Supabase Storage (URL bertanda tangan) dan kembalikan URL publiknya. */
+async function uploadToStorage(file: File, onPct?: (n: number) => void): Promise<{ url?: string; error?: string }> {
+  const p = await prepareMediaUpload(file.name, file.type, file.size);
+  if (!p.ok) return { error: p.error };
+  const fd = new FormData();
+  fd.append("cacheControl", "31536000");
+  fd.append("", file);
+  return new Promise((resolve) => {
+    const x = new XMLHttpRequest();
+    x.open("PUT", p.uploadUrl);
+    x.setRequestHeader("apikey", p.anonKey);
+    x.setRequestHeader("Authorization", `Bearer ${p.anonKey}`);
+    x.setRequestHeader("x-upsert", "false");
+    x.upload.onprogress = (e) => e.lengthComputable && onPct?.(Math.round((e.loaded / e.total) * 100));
+    x.onload = () => resolve(x.status >= 200 && x.status < 300 ? { url: p.publicUrl } : { error: `Upload gagal (${x.status}). ${x.responseText.slice(0, 120)}` });
+    x.onerror = () => resolve({ error: "Koneksi terputus saat upload." });
+    x.send(fd);
+  });
+}
+
 /** Isian link media dengan tombol upload (Supabase Storage) bila diaktifkan. */
 function MediaField({ label, value, onChange, accept = "image", storage, hint }: { label: string; value: string; onChange: (v: string) => void; accept?: "image" | "video" | "any"; storage: boolean; hint?: string }) {
   const input = useRef<HTMLInputElement>(null);
@@ -111,22 +131,8 @@ function MediaField({ label, value, onChange, accept = "image", storage, hint }:
 
   async function upload(file: File) {
     setErr(""); setPct(0);
-    const p = await prepareMediaUpload(file.name, file.type, file.size);
-    if (!p.ok) { setErr(p.error); setPct(null); return; }
-    const fd = new FormData();
-    fd.append("cacheControl", "31536000");
-    fd.append("", file);
-    await new Promise<void>((resolve) => {
-      const x = new XMLHttpRequest();
-      x.open("PUT", p.uploadUrl);
-      x.setRequestHeader("apikey", p.anonKey);
-      x.setRequestHeader("Authorization", `Bearer ${p.anonKey}`);
-      x.setRequestHeader("x-upsert", "false");
-      x.upload.onprogress = (e) => e.lengthComputable && setPct(Math.round((e.loaded / e.total) * 100));
-      x.onload = () => { if (x.status >= 200 && x.status < 300) onChange(p.publicUrl); else setErr(`Upload gagal (${x.status}). ${x.responseText.slice(0, 120)}`); resolve(); };
-      x.onerror = () => { setErr("Koneksi terputus saat upload."); resolve(); };
-      x.send(fd);
-    });
+    const r = await uploadToStorage(file, setPct);
+    if (r.url) onChange(r.url); else setErr(r.error ?? "Upload gagal.");
     setPct(null);
   }
 
@@ -159,6 +165,86 @@ function MediaField({ label, value, onChange, accept = "image", storage, hint }:
       )}
       {!storage && !value && <p className="mt-1 text-xs text-muted">Upload langsung belum aktif — tempel link gambar/video (Google Drive, YouTube, dll.).</p>}
     </div>
+  );
+}
+
+/** Kotak foto kecil (klik untuk upload, atau tempel link bila upload belum aktif). */
+function PhotoSlot({ value, onChange, storage }: { value: string; onChange: (v: string) => void; storage: boolean }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [pct, setPct] = useState<number | null>(null);
+  const [err, setErr] = useState("");
+  async function pick(file: File) {
+    setErr(""); setPct(0);
+    const r = await uploadToStorage(file, setPct);
+    if (r.url) onChange(r.url); else setErr(r.error ?? "Gagal");
+    setPct(null);
+  }
+  return (
+    <div>
+      <div className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-dashed border-line bg-panel2">
+        {value
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={imageSrc(value)} alt="" className="size-full object-cover" />
+          : <button type="button" disabled={!storage} onClick={() => input.current?.click()} className="grid size-full place-items-center text-xs font-semibold text-muted disabled:cursor-default">{storage ? "+ Foto" : "Kosong"}</button>}
+        {storage && <input ref={input} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void pick(f); }} />}
+        {value && <button type="button" aria-label="Hapus foto" onClick={() => onChange("")} className="absolute right-1 top-1 grid size-6 place-items-center rounded-full bg-black/60 text-white opacity-0 transition group-hover:opacity-100 [@media(hover:none)]:opacity-100"><Icon name="x" className="size-3.5" /></button>}
+        {value && storage && <button type="button" aria-label="Ganti foto" onClick={() => input.current?.click()} className="absolute bottom-1 right-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white opacity-0 transition group-hover:opacity-100 [@media(hover:none)]:opacity-100">Ganti</button>}
+        {pct !== null && <div className="absolute inset-0 grid place-items-center bg-black/60 text-sm font-bold text-white">{pct}%</div>}
+      </div>
+      {!storage && <input className="input mt-1.5 !min-h-9 !text-xs" value={value} onChange={(e) => onChange(e.target.value)} placeholder="Link foto (https://…)" />}
+      {err && <p className="mt-1 text-[11px] font-semibold text-bad">{err}</p>}
+    </div>
+  );
+}
+
+function StripPhotos({ cfg, upd, storage }: { cfg: SiteConfig; upd: Upd; storage: boolean }) {
+  const bulk = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState("");
+  const [links, setLinks] = useState("");
+  const photos = cfg.hero.strip_photos;
+  async function fillMany(files: File[]) {
+    const empty = photos.map((v, i) => (v ? -1 : i)).filter((i) => i >= 0);
+    const targets = empty.length ? empty : photos.map((_, i) => i);
+    for (let n = 0; n < Math.min(files.length, targets.length); n++) {
+      setBusy(`Mengunggah ${n + 1}/${Math.min(files.length, targets.length)}…`);
+      const r = await uploadToStorage(files[n]);
+      if (!r.url) { setBusy(r.error ?? "Gagal"); return; }
+      upd((d) => { d.hero.strip_photos[targets[n]] = r.url!; });
+    }
+    setBusy("");
+  }
+  return (
+    <Card title="Foto strip" hint="Tiga strip foto di banner. Kosongkan semua untuk memakai foto dari tab Galeri secara otomatis; slot yang kosong menampilkan warna ruang.">
+      {storage && (
+        <div className="flex flex-wrap items-center gap-3">
+          <input ref={bulk} type="file" multiple accept="image/*" className="hidden" onChange={(e) => { const f = [...(e.target.files ?? [])]; e.target.value = ""; if (f.length) void fillMany(f); }} />
+          <button type="button" className="btn btn-primary btn-sm" disabled={!!busy && !busy.includes("Gagal")} onClick={() => bulk.current?.click()}>Upload beberapa foto sekaligus</button>
+          <span className="text-sm text-muted">{busy || "Mengisi slot kosong berurutan (maks 9)."}</span>
+        </div>
+      )}
+      <div className="grid grid-cols-3 gap-3 sm:gap-5">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="rounded-2xl bg-white p-2 shadow-sm sm:p-3" style={{ transform: `rotate(${[-3, 1.5, 4][i]}deg)` }}>
+            <p className="mb-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-zinc-400">Strip {i + 1}</p>
+            <div className="space-y-2">
+              {[0, 1, 2].map((j) => (
+                <PhotoSlot key={j} storage={storage} value={photos[i * 3 + j] ?? ""} onChange={(v) => upd((d) => { d.hero.strip_photos[i * 3 + j] = v; })} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <details className="rounded-xl bg-panel2 p-3 text-sm">
+        <summary className="cursor-pointer font-semibold">Atau tempel link foto (satu per baris)</summary>
+        <textarea className="input mt-2" value={links} onChange={(e) => setLinks(e.target.value)} placeholder={"https://…/foto1.jpg\nhttps://…/foto2.jpg"} />
+        <button type="button" className="btn btn-sm mt-2" onClick={() => {
+          const list = links.split(/\r?\n/).map((x) => x.trim()).filter((x) => /^https?:\/\//i.test(x)).slice(0, 9);
+          upd((d) => { d.hero.strip_photos = Array.from({ length: 9 }, (_, i) => list[i] ?? ""); });
+        }}>Terapkan ke slot (urut)</button>
+        <p className="mt-1 text-xs text-muted">Link Google Drive juga didukung. Slot diisi berurutan: strip 1 (3 foto), strip 2, strip 3.</p>
+      </details>
+      {photos.some(Boolean) && <button type="button" className="btn btn-sm btn-danger" onClick={() => upd((d) => { d.hero.strip_photos = Array(9).fill(""); })}>Kosongkan semua foto strip</button>}
+    </Card>
   );
 }
 
@@ -275,6 +361,7 @@ function Hero({ cfg, upd, storage }: { cfg: SiteConfig; upd: Upd; storage: boole
             <button key={k} type="button" className="chip" data-on={h.media_type === k} onClick={() => upd((d) => { d.hero.media_type = k; })}>{l}</button>
           ))}
         </div>
+        {h.media_type === "strips" && <p className="text-sm text-muted">Strip foto muncul di sisi kanan banner. Isi foto-fotonya di kartu “Foto strip” di bawah.</p>}
         {h.media_type !== "strips" && (
           <>
             <div className="flex flex-wrap gap-2">
@@ -291,6 +378,7 @@ function Hero({ cfg, upd, storage }: { cfg: SiteConfig; upd: Upd; storage: boole
           </>
         )}
       </Card>
+      {h.media_type === "strips" && <StripPhotos cfg={cfg} upd={upd} storage={storage} />}
     </>
   );
 }

@@ -92,6 +92,8 @@ function Hero({ d, bgHero }: { d: Data; bgHero: boolean }) {
   const strip = rooms.slice(0, 3);
   const fallbackColors = ["#4f4fe8", "#a78bfa", "#f472b6"];
   const hasMedia = h.media_type !== "strips" && !!h.media_url;
+  // Foto strip: dari CMS; jika kosong, otomatis memakai foto Galeri.
+  const photos = h.strip_photos.some(Boolean) ? h.strip_photos : site.gallery.items.map((g) => g.url).slice(0, 9);
   const muted = bgHero ? "text-white/80" : "text-muted";
   const stats = site.stats.items.length ? site.stats.items : [
     { value: rooms.length ? `${rooms.length}` : "", label: "pilihan background" },
@@ -173,14 +175,17 @@ function Hero({ d, bgHero }: { d: Data; bgHero: boolean }) {
                       <Reveal immediate delay={250 + i * 150} className={`absolute ${pos}`}>
                         <div className="floaty w-[9.5rem] rounded-2xl bg-white p-2.5 shadow-2xl shadow-black/20 sm:w-44" style={{ ["--r" as string]: rot, transform: `rotate(${rot})`, animationDelay: `${-i * 2.2}s` }}>
                           <div className="space-y-2">
-                            {[0, 1, 2].map((j) => (
-                              <div key={j} className="relative aspect-[4/3] overflow-hidden rounded-lg" style={{ background: r?.image_url && j === 0 ? undefined : roomGradient(color), opacity: 1 - j * 0.08 }}>
-                                {r?.image_url && j === 0 ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={imageSrc(r.image_url)} alt="" className="size-full object-cover" />
-                                ) : <Icon name="camera" className="absolute inset-0 m-auto size-6 text-white/55" />}
-                              </div>
-                            ))}
+                            {[0, 1, 2].map((j) => {
+                              const ph = photos[i * 3 + j] || (j === 0 ? r?.image_url : "");
+                              return (
+                                <div key={j} className="relative aspect-[4/3] overflow-hidden rounded-lg" style={{ background: ph ? undefined : roomGradient(color), opacity: ph ? 1 : 1 - j * 0.08 }}>
+                                  {ph ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={imageSrc(ph)} alt="" className="size-full object-cover" />
+                                  ) : <Icon name="camera" className="absolute inset-0 m-auto size-6 text-white/55" />}
+                                </div>
+                              );
+                            })}
                           </div>
                           <p className="font-display mt-2 text-center text-[10px] font-bold tracking-[.25em] text-zinc-400">{studio.name.toUpperCase()}</p>
                         </div>

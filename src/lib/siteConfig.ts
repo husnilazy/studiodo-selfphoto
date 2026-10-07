@@ -25,6 +25,7 @@ export type SiteConfig = {
   hero: {
     badge: string; title: string; highlight: string; subtitle: string; cta1: string; cta2: string;
     media_type: "strips" | "video" | "image"; media_layout: "frame" | "background"; media_url: string; poster_url: string; overlay: number;
+    strip_photos: string[]; // 3 strip × 3 foto, urut kiri-ke-kanan lalu atas-ke-bawah
   };
   stats: { items: { value: string; label: string }[] };
   marquee: { enabled: boolean; words: string[] };
@@ -50,7 +51,7 @@ export const DEFAULT_SITE: SiteConfig = {
   hero: {
     badge: "Slot hari ini masih tersedia", title: "Abadikan momen,", highlight: "tanpa ribet.", subtitle: "",
     cta1: "Booking Sekarang", cta2: "Lihat Layanan",
-    media_type: "strips", media_layout: "frame", media_url: "", poster_url: "", overlay: 55,
+    media_type: "strips", media_layout: "frame", media_url: "", poster_url: "", overlay: 55, strip_photos: Array(9).fill(""),
   },
   stats: { items: [] },
   marquee: { enabled: true, words: ["Self Photo", "Photobox", "Photobooth Event", "Wisuda", "Couple", "Keluarga", "Ulang Tahun", "Profile Pic", "Sahabat", "Maternity", "Prewedding", "Content Creator"] },
@@ -111,6 +112,7 @@ export function sanitizeSite(input: unknown): SiteConfig {
       cta1: str(h.cta1, 40, D.hero.cta1), cta2: str(h.cta2, 40, D.hero.cta2),
       media_type: pick(h.media_type, ["strips", "video", "image"] as const, "strips"), media_layout: pick(h.media_layout, ["frame", "background"] as const, "frame"),
       media_url: url(h.media_url), poster_url: url(h.poster_url), overlay: num(h.overlay, 0, 90, D.hero.overlay),
+      strip_photos: Array.from({ length: 9 }, (_, i) => url((Array.isArray(h.strip_photos) ? h.strip_photos : [])[i])),
     },
     stats: { items: list(o("stats").items, 4, (x) => (str(x.value, 20) ? { value: str(x.value, 20), label: str(x.label, 40) } : null)) },
     marquee: { enabled: bool(mq.enabled, true), words: (Array.isArray(mq.words) ? mq.words : D.marquee.words).map((w) => str(w, 40)).filter(Boolean).slice(0, 30) },
