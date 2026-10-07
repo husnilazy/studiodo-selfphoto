@@ -22,6 +22,8 @@ export default async function TermsPage() {
         {
           title: "Booking & jadwal", body: (
             <ul>
+              <li>Semua sesi foto <b>wajib reservasi slot</b> terlebih dahulu, kecuali Photobooth Outdoor yang bisa langsung datang (walk-in) tanpa antre booking.</li>
+              <li>Mohon <b>hadir 10 menit sebelum</b> sesi foto dimulai.</li>
               <li>Booking online berstatus <b>menunggu</b> sampai dikonfirmasi oleh tim kami.</li>
               <li>Satu background (ruang) tidak dapat dipesan oleh dua sesi pada waktu yang sama. Jam yang tampil di website adalah jam yang masih kosong saat itu.</li>
               <li>Durasi sesi mengikuti paket yang Anda pilih. Perpanjangan waktu dapat dilakukan bila jadwal berikutnya di ruang yang sama masih kosong, dengan biaya sesuai tarif tambahan.</li>
@@ -32,7 +34,8 @@ export default async function TermsPage() {
         {
           title: "Pembayaran & DP", body: (
             <ul>
-              <li>Harga dinyatakan dalam rupiah. Pembayaran dapat dilakukan secara tunai, QRIS, atau transfer sesuai yang tersedia di studio.</li>
+              <li>Harga dinyatakan dalam rupiah dan berlaku <b>per orang</b>, kecuali paket yang tertulis per sesi atau per paket.</li>
+              <li>Kami menerima pembayaran melalui transfer bank, QRIS, dan tunai (cash).</li>
               {online.dp_percent > 0
                 ? <li>Untuk mengunci jadwal, diperlukan <b>DP sebesar {online.dp_percent}%</b> dari total. {online.hold_min > 0 && <>Jadwal ditahan selama sekitar {hours} jam; jika DP belum diterima, jadwal dapat dilepas otomatis.</>}</li>
                 : <li>Booking online saat ini tidak mewajibkan DP; tim kami akan mengonfirmasi melalui WhatsApp.</li>}

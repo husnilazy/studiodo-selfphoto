@@ -11,7 +11,7 @@ const img = (fd: FormData) => {
   if (u && !/^https?:\/\//i.test(u)) throw new Error("Link foto harus diawali http:// atau https://");
   return u;
 };
-const CATS = ["self_photo", "photobox", "photobooth", "lainnya"];
+const CATS = ["self_photo", "photobox", "photobooth", "wisuda", "keluarga", "lainnya"];
 const TABLES = { packages: "packages", rooms: "rooms", addons: "addons" } as const;
 
 export async function savePackage(id: number | null, _p: ActionState, fd: FormData) {

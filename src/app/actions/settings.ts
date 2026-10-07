@@ -11,7 +11,7 @@ export async function saveStudio(_p: ActionState, fd: FormData) {
     const open = str(fd, "open"), close = str(fd, "close");
     if (!/^\d{2}:\d{2}$/.test(open) || !/^\d{2}:\d{2}$/.test(close) || open >= close) throw new Error("Jam buka harus sebelum jam tutup.");
     const slot = int(fd, "slot");
-    if (![15, 20, 30, 60].includes(slot)) throw new Error("Interval slot tidak valid.");
+    if (![5, 10, 15, 20, 30, 60].includes(slot)) throw new Error("Interval slot tidak valid.");
     const value = { name: req(str(fd, "name"), "Nama studio wajib diisi."), address: str(fd, "address"), phone: str(fd, "phone"), open, close, slot, footer: str(fd, "footer") };
     await q("insert into settings (key, value) values ('studio', $1::jsonb) on conflict (key) do update set value = excluded.value", [JSON.stringify(value)]);
     revalidatePath("/", "layout");

@@ -10,6 +10,8 @@ const BLURB: Record<string, string> = {
   self_photo: "Foto sendiri di studio, atur pose dan ekspresimu sepuasnya.",
   photobox: "Photobox bertema, cepat, seru, dan hasilnya langsung jadi.",
   photobooth: "Photobooth untuk acara: pernikahan, ulang tahun, hingga gathering.",
+  wisuda: "Abadikan hari kelulusanmu dengan retouch profesional.",
+  keluarga: "Foto keluarga dan pas foto resmi dengan hasil rapi.",
   lainnya: "Layanan lainnya.",
 };
 

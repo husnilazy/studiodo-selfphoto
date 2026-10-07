@@ -5,7 +5,7 @@ export type JLine = { account: string; debit?: number; credit?: number };
 
 export const METHOD_ACCOUNT: Record<string, string> = { cash: "1101", transfer: "1102", qris: "1103" };
 export const CATEGORY_ACCOUNT: Record<string, string> = {
-  self_photo: "4101", photobox: "4102", photobooth: "4103", addon: "4104", lainnya: "4105",
+  self_photo: "4101", photobox: "4102", photobooth: "4103", addon: "4104", lainnya: "4105", wisuda: "4106", keluarga: "4107",
 };
 
 /** Mencatat satu jurnal berimbang (debit = kredit). `account` = kode akun. */

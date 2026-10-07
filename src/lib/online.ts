@@ -23,7 +23,7 @@ export async function expireStalePending() {
   if (Date.now() - lastExpire < 30_000) return; // cukup tiap 30 detik per instance
   lastExpire = Date.now();
   const o = await getOnline();
-  if (o.hold_min <= 0) return;
+  if (o.hold_min <= 0 || o.dp_percent <= 0) return; // tanpa DP, booking tidak dilepas otomatis
   await q(
     `update bookings set status = 'cancelled', notes = trim(notes || ' [Dibatalkan otomatis: melewati batas waktu DP]')
       where source = 'website' and status = 'pending' and created_at < now() - ($1 || ' minutes')::interval

@@ -1,7 +1,7 @@
 // Skema database STUDIODO Kasir (PostgreSQL / Supabase). Idempotent: aman dijalankan berulang.
 // Semua nilai uang disimpan sebagai bigint rupiah (tanpa desimal).
 // NAIKKAN versi ini setiap kali SCHEMA diubah agar database yang sudah ada ikut ter-upgrade.
-export const SCHEMA_VERSION = "2026-10-07.2";
+export const SCHEMA_VERSION = "2026-10-07.3";
 
 export const SCHEMA = `
 create table if not exists users (
@@ -236,6 +236,14 @@ create table if not exists package_rooms (
   primary key (package_id, room_id)
 );
 alter table package_rooms enable row level security;
+
+-- Kategori tambahan (Wisuda, Keluarga & Pas Foto) + akun pendapatannya
+alter table packages drop constraint if exists packages_category_check;
+alter table packages add constraint packages_category_check check (category in ('self_photo','photobox','photobooth','wisuda','keluarga','lainnya'));
+insert into accounts (code, name, type, subtype, cf_category, is_system, sort) values
+ ('4106','Pendapatan Wisuda','revenue','sales','operating',true,45),
+ ('4107','Pendapatan Foto Keluarga & Pas Foto','revenue','sales','operating',true,46)
+on conflict (code) do nothing;
 alter table packages add column if not exists image_url text not null default '';
 
 -- Monitoring sesi live

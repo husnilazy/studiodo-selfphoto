@@ -80,7 +80,7 @@ export const STATUS_TONE: Record<string, string> = {
   pending: "amber", confirmed: "indigo", done: "green", cancelled: "red", no_show: "slate",
 };
 export const CATEGORY_LABEL: Record<string, string> = {
-  self_photo: "Self Photo", photobox: "Photobox", photobooth: "Photobooth", lainnya: "Lainnya",
+  self_photo: "Self Photo", photobox: "Photobox", photobooth: "Photobooth", wisuda: "Wisuda", keluarga: "Keluarga & Pas Foto", lainnya: "Lainnya",
 };
 export const METHOD_LABEL: Record<string, string> = { cash: "Tunai", qris: "QRIS", transfer: "Transfer" };
 export const SOURCE_LABEL: Record<string, string> = {

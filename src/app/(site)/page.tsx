@@ -323,7 +323,7 @@ function Location({ d }: { d: Data }) {
               <h2 className="font-display mt-3 text-4xl font-semibold tracking-tight">{l.title}</h2>
               {l.subtitle && <p className="mt-3 text-muted">{l.subtitle}</p>}
               <dl className="mt-8 space-y-5">
-                <Info icon="clock" k="Jam buka" v={`Setiap hari, ${studio.open} – ${studio.close} WIB${l.hours_note ? ` · ${l.hours_note}` : ""}`} />
+                <Info icon="clock" k="Jam buka" v={`${studio.open} – ${studio.close} WIB${l.hours_note ? ` · ${l.hours_note}` : ""}`} />
                 {address && <Info icon="home" k="Alamat" v={address} />}
                 {(online.whatsapp || studio.phone) && <Info icon="chat" k="WhatsApp" v={online.whatsapp || studio.phone} />}
                 {online.instagram && <Info icon="camera" k="Instagram" v={`@${online.instagram}`} />}

@@ -33,7 +33,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               <Field label="Jam buka"><input type="time" name="open" className="input" defaultValue={studio.open} required /></Field>
               <Field label="Jam tutup"><input type="time" name="close" className="input" defaultValue={studio.close} required /></Field>
               <Field label="Slot (menit)">
-                <select name="slot" className="input" defaultValue={studio.slot}>{[15, 20, 30, 60].map((v) => <option key={v} value={v}>{v}</option>)}</select>
+                <select name="slot" className="input" defaultValue={studio.slot}>{[5, 10, 15, 20, 30, 60].map((v) => <option key={v} value={v}>{v}</option>)}</select>
               </Field>
             </div>
             <Field label="Catatan kaki struk"><input name="footer" className="input" defaultValue={studio.footer} /></Field>
