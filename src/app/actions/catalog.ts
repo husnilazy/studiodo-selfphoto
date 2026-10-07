@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { q } from "@/lib/db";
+import { q, tx } from "@/lib/db";
+import { parseOptions } from "@/lib/packageUtils";
 import { actionUser } from "@/lib/auth";
 import { bool, int, req, safe, str } from "@/lib/action";
 import type { ActionState } from "@/components/ActionForm";
@@ -23,10 +24,25 @@ export async function savePackage(id: number | null, _p: ActionState, fd: FormDa
     const duration = int(fd, "duration_min");
     if (price < 0) throw new Error("Harga tidak valid.");
     if (duration < 5) throw new Error("Durasi minimal 5 menit.");
-    const v = [name, category, str(fd, "description"), str(fd, "includes"), price, duration, Math.max(1, int(fd, "max_people")), bool(fd, "active"), img(fd)];
-    if (id) await q("update packages set name=$1, category=$2, description=$3, includes=$4, price=$5, duration_min=$6, max_people=$7, active=$8, image_url=$9 where id=$10", [...v, id]);
-    else await q("insert into packages (name, category, description, includes, price, duration_min, max_people, active, image_url) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)", v);
+    const optionLabel = str(fd, "option_label").slice(0, 40);
+    const options = parseOptions(str(fd, "options")).join("\n");
+    if (options && !optionLabel) throw new Error("Isi nama pilihan (mis. Warna background) bila ada daftar pilihan.");
+    const v = [name, category, str(fd, "description"), str(fd, "includes"), price, duration, Math.max(1, int(fd, "max_people")), bool(fd, "active"), img(fd),
+      fd.get("pricing") === "per_person", bool(fd, "bookable_online"), optionLabel, options];
+    const roomIds = [...new Set(fd.getAll("room_ids").map((x) => Number(x)).filter((n) => Number.isInteger(n) && n > 0))];
+    await tx(async (t) => {
+      let pid = id;
+      if (id) {
+        await t("update packages set name=$1, category=$2, description=$3, includes=$4, price=$5, duration_min=$6, max_people=$7, active=$8, image_url=$9, per_person=$10, bookable_online=$11, option_label=$12, options=$13 where id=$14", [...v, id]);
+      } else {
+        const [r] = await t<{ id: number }>("insert into packages (name, category, description, includes, price, duration_min, max_people, active, image_url, per_person, bookable_online, option_label, options) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning id", v);
+        pid = r.id;
+      }
+      await t("delete from package_rooms where package_id = $1", [pid]);
+      for (const rid of roomIds) await t("insert into package_rooms (package_id, room_id) values ($1,$2) on conflict do nothing", [pid, rid]);
+    });
     revalidatePath("/paket");
+    revalidatePath("/", "layout");
   });
 }
 

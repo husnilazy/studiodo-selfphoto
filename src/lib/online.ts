@@ -39,10 +39,11 @@ export async function publicSlots(date: string, packageId: number, roomId: numbe
   const [o, studio] = await Promise.all([getOnline(), getStudio()]);
   const today = todayWIB();
   if (!o.enabled || date < today || date > addDays(today, o.days_ahead)) return [];
-  const pkg = await one<{ duration_min: number }>("select duration_min from packages where id = $1 and active", [packageId]);
+  const pkg = await one<{ duration_min: number }>("select duration_min from packages where id = $1 and active and bookable_online", [packageId]);
   if (!pkg) return [];
+  const allowed = (await q<{ room_id: number }>("select room_id from package_rooms where package_id = $1", [packageId])).map((r) => r.room_id);
   const rooms = (await q<{ id: number }>("select id from rooms where active order by sort, id")).map((r) => r.id)
-    .filter((id) => roomId === null || id === roomId);
+    .filter((id) => (allowed.length === 0 || allowed.includes(id)) && (roomId === null || id === roomId));
   if (!rooms.length) return [];
 
   const from = fromWIB(date, "00:00"), to = new Date(from.getTime() + 86400000);

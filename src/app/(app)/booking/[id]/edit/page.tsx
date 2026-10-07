@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/ui";
 import BookingForm, { type BookingInit } from "@/components/BookingForm";
 import { requireUser } from "@/lib/auth";
 import { q } from "@/lib/db";
-import { activeAddons, activePackages, activeRooms, getStudio } from "@/lib/data";
+import { PACKAGE_SELECT, activeAddons, activePackages, activeRooms, getStudio } from "@/lib/data";
 import { dateWIB, timeWIB, todayWIB } from "@/lib/format";
 
 export const metadata = { title: "Edit Booking" };
@@ -12,8 +12,8 @@ export default async function EditBooking({ params }: { params: Promise<{ id: st
   await requireUser();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const [b] = await q<{ id: number; customer_id: number; package_id: number | null; room_id: number | null; start_at: string; people: number; source: string; discount: number; notes: string; name: string; phone: string }>(
-    `select b.id, b.customer_id, b.package_id, b.room_id, b.start_at, b.people, b.source, b.discount, b.notes, c.name, c.phone
+  const [b] = await q<{ id: number; customer_id: number; package_id: number | null; room_id: number | null; start_at: string; people: number; source: string; discount: number; notes: string; name: string; phone: string; option_choice: string }>(
+    `select b.id, b.customer_id, b.package_id, b.room_id, b.start_at, b.people, b.source, b.discount, b.notes, b.option_choice, c.name, c.phone
        from bookings b join customers c on c.id = b.customer_id where b.id = $1`, [id]);
   if (!b) notFound();
   const items = await q<{ kind: string; ref_id: number | null; qty: number; name: string; unit_price: number }>("select kind, ref_id, qty, name, unit_price from booking_items where booking_id = $1", [id]);
@@ -29,14 +29,14 @@ export default async function EditBooking({ params }: { params: Promise<{ id: st
     const missing = ids.filter((x) => !list.some((l) => l.id === x));
     return missing.length ? q<any>(sql, [missing]) : [];
   };
-  packages = [...packages, ...(await need(packages, b.package_id ? [b.package_id] : [], "select id, name, category, price, duration_min, max_people from packages where id = any($1)"))];
+  packages = [...packages, ...(await need(packages, b.package_id ? [b.package_id] : [], `${PACKAGE_SELECT} where p.id = any($1)`))];
   rooms = [...rooms, ...(await need(rooms, b.room_id ? [b.room_id] : [], "select id, name, color from rooms where id = any($1)"))];
   addons = [...addons, ...(await need(addons, Object.keys(addonQty).map(Number), "select id, name, price from addons where id = any($1)"))];
 
   const init: BookingInit = {
     id: b.id, customer: { id: b.customer_id, name: b.name, phone: b.phone }, package_id: b.package_id, room_id: b.room_id,
     date: dateWIB(b.start_at), time: timeWIB(b.start_at), people: b.people, source: b.source, discount: b.discount, notes: b.notes,
-    addons: addonQty, custom_name: customName, custom_price: customPrice,
+    addons: addonQty, custom_name: customName, custom_price: customPrice, option_choice: b.option_choice,
   };
   return (
     <>

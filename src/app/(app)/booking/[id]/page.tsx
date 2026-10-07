@@ -21,7 +21,7 @@ export const metadata = { title: "Detail Booking" };
 
 type B = {
   id: number; code: string; start_at: string; end_at: string; people: number; status: string; source: string; discount: number; total: number; notes: string;
-  customer_id: number; customer_name: string; customer_phone: string; room_name: string | null; room_color: string | null; package_name: string | null; created_by_name: string | null;
+  option_choice: string; customer_id: number; customer_name: string; customer_phone: string; room_name: string | null; room_color: string | null; package_name: string | null; created_by_name: string | null;
 };
 type Item = { id: number; name: string; qty: number; unit_price: number; amount: number };
 type Pay = { id: number; kind: string; method: string; amount: number; paid_at: string; note: string; voided: boolean };
@@ -31,7 +31,7 @@ export default async function BookingDetail({ params }: { params: Promise<{ id: 
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
   const [b] = await q<B>(
-    `select b.id, b.code, b.start_at, b.end_at, b.people, b.status, b.source, b.discount, b.total, b.notes,
+    `select b.id, b.code, b.start_at, b.end_at, b.people, b.status, b.source, b.discount, b.total, b.notes, b.option_choice,
             c.id as customer_id, c.name as customer_name, c.phone as customer_phone,
             r.name as room_name, r.color as room_color, p.name as package_name, u.name as created_by_name
        from bookings b join customers c on c.id = b.customer_id
@@ -52,7 +52,7 @@ export default async function BookingDetail({ params }: { params: Promise<{ id: 
   const canManage = user.role !== "kasir";
   const day = dateWIB(b.start_at);
 
-  const waMsg = `Halo ${b.customer_name}, ini konfirmasi booking di ${studio.name}:\n📅 ${fmtDate(day, { weekday: true })}\n🕐 ${timeWIB(b.start_at)}–${timeWIB(b.end_at)}\n📸 ${b.package_name ?? "-"}${b.room_name ? ` (${b.room_name})` : ""}\nTotal ${rupiah(b.total)}${due > 0 ? ` · Sisa ${rupiah(due)}` : " · Lunas"}\nKode: ${b.code}\nSampai jumpa!`;
+  const waMsg = `Halo ${b.customer_name}, ini konfirmasi booking di ${studio.name}:\n📅 ${fmtDate(day, { weekday: true })}\n🕐 ${timeWIB(b.start_at)}–${timeWIB(b.end_at)}\n📸 ${b.package_name ?? "-"}${b.option_choice ? ` — ${b.option_choice}` : ""}${b.room_name ? ` (${b.room_name})` : ""}\nTotal ${rupiah(b.total)}${due > 0 ? ` · Sisa ${rupiah(due)}` : " · Lunas"}\nKode: ${b.code}\nSampai jumpa!`;
 
   return (
     <>
@@ -85,6 +85,7 @@ export default async function BookingDetail({ params }: { params: Promise<{ id: 
             <Info k="Tanggal" v={fmtDate(day, { weekday: true })} />
             <Info k="Waktu" v={`${timeWIB(b.start_at)} – ${timeWIB(b.end_at)} WIB`} />
             <Info k="Paket" v={b.package_name ?? "—"} />
+            {b.option_choice && <Info k="Pilihan" v={b.option_choice} />}
             <Info k="Ruang" v={b.room_name ? <span className="inline-flex items-center gap-2"><span className="size-2.5 rounded-full" style={{ background: b.room_color ?? "" }} />{b.room_name}</span> : "—"} />
             <Info k="Jumlah orang" v={`${b.people}`} />
             <Info k="Sumber" v={SOURCE_LABEL[b.source] ?? b.source} />

@@ -25,7 +25,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id" className={`${jakarta.variable} ${sora.variable}`} suppressHydrationWarning>
+    <html lang="id" data-scroll-behavior="smooth" className={`${jakarta.variable} ${sora.variable}`} suppressHydrationWarning>
       <body className="min-h-dvh antialiased">
         <Script id="sd-theme" strategy="beforeInteractive">{`try{var t=localStorage.getItem("sd_theme");if(t)document.documentElement.dataset.theme=t}catch(e){}`}</Script>
         {children}

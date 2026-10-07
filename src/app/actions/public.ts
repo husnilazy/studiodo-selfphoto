@@ -5,6 +5,7 @@ import { signToken } from "@/lib/auth";
 import { checkConflict, genCode } from "@/lib/bookingUtils";
 import { expireStalePending, getOnline, publicSlots } from "@/lib/online";
 import { fromWIB } from "@/lib/format";
+import { parseOptions, roomAllowed, unitsFor } from "@/lib/packageUtils";
 
 type Result = { ok: true; redirect: string } | { ok: false; error: string };
 const fail = (error: string): Result => ({ ok: false, error });
@@ -41,11 +42,17 @@ export async function createPublicBooking(fd: FormData): Promise<Result> {
     const slot = slots.find((s) => s.t === time);
     if (!slot) return fail("Maaf, jam itu baru saja terisi. Silakan pilih jam lain.");
 
+    let option = "";
     const id = await tx(async (t) => {
-      const [pkg] = await t<{ id: number; name: string; price: number; category: string; duration_min: number; max_people: number }>(
-        "select id, name, price, category, duration_min, max_people from packages where id = $1 and active", [pkgId]);
-      if (!pkg) throw new Error("Paket tidak tersedia.");
-      const items = [{ kind: "package", ref_id: pkg.id, name: pkg.name, qty: 1, unit_price: pkg.price, category: pkg.category }];
+      const [pkg] = await t<{ id: number; name: string; price: number; category: string; duration_min: number; max_people: number; per_person: boolean; option_label: string; options: string }>(
+        "select id, name, price, category, duration_min, max_people, per_person, option_label, options from packages where id = $1 and active and bookable_online", [pkgId]);
+      if (!pkg) throw new Error("Paket ini tidak bisa dipesan online. Silakan hubungi kami.");
+      const guests = Math.min(people, pkg.max_people);
+      const opts = parseOptions(pkg.options);
+      option = opts.length ? String(fd.get("option_choice") ?? "") : "";
+      if (opts.length && !opts.includes(option)) throw new Error(`Pilih ${pkg.option_label || "varian"} terlebih dulu.`);
+      const allowed = (await t<{ room_id: number }>("select room_id from package_rooms where package_id = $1", [pkg.id])).map((r) => r.room_id);
+      const items = [{ kind: "package", ref_id: pkg.id, name: pkg.name, qty: unitsFor(pkg, guests), unit_price: pkg.price, category: pkg.category }];
       for (const [k, v] of fd.entries()) {
         const m = /^addon_(\d+)$/.exec(k);
         const qty = Math.min(20, parseInt(String(v), 10) || 0);
@@ -59,6 +66,7 @@ export async function createPublicBooking(fd: FormData): Promise<Result> {
       // Pilih ruang: yang diminta, atau yang pertama kosong.
       let roomId = wantRoom;
       if (!roomId) roomId = slot.rooms[0];
+      if (!roomAllowed({ room_ids: allowed }, roomId)) throw new Error("Background itu tidak tersedia untuk layanan ini.");
       await checkConflict(t, roomId, start, end, null);
 
       let customerId: number;
@@ -68,10 +76,10 @@ export async function createPublicBooking(fd: FormData): Promise<Result> {
 
       const code = await genCode(t);
       const [b] = await t<{ id: number }>(
-        `insert into bookings (code, customer_id, package_id, room_id, start_at, end_at, people, status, source, discount, total, notes)
-         values ($1,$2,$3,$4,$5,$6,$7,'pending','website',0,$8,$9) returning id`,
-        [code, customerId, pkg.id, roomId, start.toISOString(), end.toISOString(), Math.min(people, pkg.max_people), total,
-          `[Booking online]${name ? ` a.n. ${name}` : ""}${notes ? ` — ${notes}` : ""}`]);
+        `insert into bookings (code, customer_id, package_id, room_id, start_at, end_at, people, status, source, discount, total, notes, option_choice)
+         values ($1,$2,$3,$4,$5,$6,$7,'pending','website',0,$8,$9,$10) returning id`,
+        [code, customerId, pkg.id, roomId, start.toISOString(), end.toISOString(), guests, total,
+          `[Booking online]${name ? ` a.n. ${name}` : ""}${notes ? ` — ${notes}` : ""}`, option]);
       for (const i of items) {
         await t("insert into booking_items (booking_id, kind, ref_id, name, qty, unit_price, amount, category) values ($1,$2,$3,$4,$5,$6,$7,$8)",
           [b.id, i.kind, i.ref_id, i.name, i.qty, i.unit_price, i.qty * i.unit_price, i.category]);

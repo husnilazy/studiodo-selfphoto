@@ -10,7 +10,8 @@ export const metadata = { title: "Booking Online", robots: { index: false, follo
 export default async function BookPage({ searchParams }: { searchParams: Promise<{ paket?: string; room?: string }> }) {
   const sp = await searchParams;
   await expireStalePending();
-  const { studio, online, packages, rooms, addons } = await getSiteData();
+  const { studio, online, packages: allPackages, rooms, addons } = await getSiteData();
+  const packages = allPackages.filter((p) => p.bookable_online);
   const today = todayWIB();
 
   if (!online.enabled || packages.length === 0) {

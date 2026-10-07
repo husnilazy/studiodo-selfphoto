@@ -6,6 +6,7 @@ import { bool, int, req, safe, str } from "@/lib/action";
 import { allocateRevenue, METHOD_ACCOUNT, postJournal, voidJournal } from "@/lib/ledger";
 import { dateWIB, fromWIB, rupiah } from "@/lib/format";
 import { checkConflict, genCode } from "@/lib/bookingUtils";
+import { parseOptions, roomAllowed, unitsFor } from "@/lib/packageUtils";
 import type { ActionState } from "@/components/ActionForm";
 
 const STATUSES = ["pending", "confirmed", "done", "cancelled", "no_show"];
@@ -33,18 +34,28 @@ async function resolveCustomer(q: Q, fd: FormData): Promise<number> {
 
 type ItemInput = { kind: "package" | "addon" | "custom"; ref_id: number | null; name: string; qty: number; unit_price: number; category: string };
 
-async function buildItems(q: Q, fd: FormData) {
+async function buildItems(q: Q, fd: FormData, roomId: number | null) {
   const items: ItemInput[] = [];
   const pkgId = int(fd, "package_id");
+  const people = Math.max(1, int(fd, "people"));
   let duration = 30;
   let pkgName = "";
+  let option = "";
   if (pkgId) {
-    const [p] = await q<{ id: number; name: string; price: number; category: string; duration_min: number }>(
-      "select id, name, price, category, duration_min from packages where id = $1", [pkgId]);
+    const [p] = await q<{ id: number; name: string; price: number; category: string; duration_min: number; per_person: boolean; max_people: number; option_label: string; options: string }>(
+      "select id, name, price, category, duration_min, per_person, max_people, option_label, options from packages where id = $1", [pkgId]);
     if (!p) throw new Error("Paket tidak ditemukan.");
+    if (people > p.max_people) throw new Error(`Paket ${p.name} maksimal ${p.max_people} orang.`);
+    const allowed = (await q<{ room_id: number }>("select room_id from package_rooms where package_id = $1", [pkgId])).map((r) => r.room_id);
+    if (!roomAllowed({ room_ids: allowed }, roomId)) throw new Error(`Paket ${p.name} hanya bisa dipakai di ruang tertentu. Pilih ruang yang sesuai.`);
+    const opts = parseOptions(p.options);
+    if (opts.length) {
+      option = str(fd, "option_choice");
+      if (!opts.includes(option)) throw new Error(`Pilih ${p.option_label || "varian"} terlebih dulu.`);
+    }
     duration = p.duration_min;
     pkgName = p.name;
-    items.push({ kind: "package", ref_id: p.id, name: p.name, qty: 1, unit_price: p.price, category: p.category });
+    items.push({ kind: "package", ref_id: p.id, name: p.name, qty: unitsFor(p, people), unit_price: p.price, category: p.category });
   }
   for (const [k, v] of fd.entries()) {
     const m = /^addon_(\d+)$/.exec(k);
@@ -59,7 +70,7 @@ async function buildItems(q: Q, fd: FormData) {
   if (items.length === 0) throw new Error("Pilih paket atau tambahkan minimal satu item.");
   const subtotal = items.reduce((s, i) => s + i.qty * i.unit_price, 0);
   const discount = Math.min(Math.max(0, int(fd, "discount")), subtotal);
-  return { items, subtotal, discount, total: subtotal - discount, duration, pkgId: pkgId || null, pkgName };
+  return { items, subtotal, discount, total: subtotal - discount, duration, pkgId: pkgId || null, pkgName, option };
 }
 
 /** Mencatat pembayaran + jurnalnya (kas bertambah, pendapatan diakui — metode kas). */
@@ -109,15 +120,15 @@ export async function createBooking(_p: ActionState, fd: FormData) {
 
     const id = await tx(async (q) => {
       const customerId = await resolveCustomer(q, fd);
-      const b = await buildItems(q, fd);
+      const b = await buildItems(q, fd, roomId);
       const end = new Date(start.getTime() + b.duration * 60000);
       await checkConflict(q, roomId, start, end, null);
       const code = await genCode(q);
       const [row] = await q<{ id: number }>(
-        `insert into bookings (code, customer_id, package_id, room_id, start_at, end_at, people, status, source, discount, total, notes, created_by)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning id`,
+        `insert into bookings (code, customer_id, package_id, room_id, start_at, end_at, people, status, source, discount, total, notes, created_by, option_choice)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) returning id`,
         [code, customerId, b.pkgId, roomId, start.toISOString(), end.toISOString(), Math.max(1, int(fd, "people")), status,
-          str(fd, "source") || "walkin", b.discount, b.total, str(fd, "notes"), user.id]);
+          str(fd, "source") || "walkin", b.discount, b.total, str(fd, "notes"), user.id, b.option]);
       for (const i of b.items) {
         await q("insert into booking_items (booking_id, kind, ref_id, name, qty, unit_price, amount, category) values ($1,$2,$3,$4,$5,$6,$7,$8)",
           [row.id, i.kind, i.ref_id, i.name, i.qty, i.unit_price, i.qty * i.unit_price, i.category]);
@@ -141,14 +152,14 @@ export async function updateBooking(id: number, _p: ActionState, fd: FormData) {
     await tx(async (q) => {
       const [cur] = await q<{ id: number }>("select id from bookings where id = $1 for update", [id]);
       if (!cur) throw new Error("Booking tidak ditemukan.");
-      const b = await buildItems(q, fd);
+      const b = await buildItems(q, fd, roomId);
       const end = new Date(start.getTime() + b.duration * 60000);
       await checkConflict(q, roomId, start, end, id);
       await q(
         `update bookings set package_id=$1, room_id=$2, start_at=$3, end_at=$4, people=$5, source=$6,
-                discount=$7, total=$8, notes=$9 where id=$10`,
+                discount=$7, total=$8, notes=$9, option_choice=$10 where id=$11`,
         [b.pkgId, roomId, start.toISOString(), end.toISOString(), Math.max(1, int(fd, "people")),
-          str(fd, "source") || "walkin", b.discount, b.total, str(fd, "notes"), id]);
+          str(fd, "source") || "walkin", b.discount, b.total, str(fd, "notes"), b.option, id]);
       await q("delete from booking_items where booking_id = $1", [id]);
       for (const i of b.items) {
         await q("insert into booking_items (booking_id, kind, ref_id, name, qty, unit_price, amount, category) values ($1,$2,$3,$4,$5,$6,$7,$8)",

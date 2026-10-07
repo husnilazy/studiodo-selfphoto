@@ -11,8 +11,8 @@ export const metadata = { title: "Booking Diterima", robots: { index: false, fol
 export default async function DonePage({ searchParams }: { searchParams: Promise<{ c?: string; t?: string }> }) {
   const { c = "", t = "" } = await searchParams;
   if (!checkToken(c, t)) notFound();
-  const [b] = await q<{ id: number; code: string; start_at: string; end_at: string; status: string; total: number; people: number; customer: string; room: string | null; package_name: string | null; paid: number }>(
-    `select b.id, b.code, b.start_at, b.end_at, b.status, b.total, b.people, cu.name as customer, r.name as room, p.name as package_name,
+  const [b] = await q<{ id: number; code: string; start_at: string; end_at: string; status: string; total: number; people: number; customer: string; room: string | null; package_name: string | null; paid: number; option_choice: string }>(
+    `select b.option_choice, b.id, b.code, b.start_at, b.end_at, b.status, b.total, b.people, cu.name as customer, r.name as room, p.name as package_name,
             coalesce((select sum(case when y.kind='refund' then -y.amount else y.amount end) from payments y where y.booking_id = b.id and not y.voided),0) as paid
        from bookings b join customers cu on cu.id = b.customer_id left join rooms r on r.id = b.room_id left join packages p on p.id = b.package_id
       where b.code = $1`, [c]);
@@ -55,6 +55,7 @@ export default async function DonePage({ searchParams }: { searchParams: Promise
           <dl className="space-y-3 text-sm">
             {([
               ["Layanan", b.package_name ?? "—"],
+              ...(b.option_choice ? [["Pilihan", b.option_choice] as [string, string]] : []),
               ["Background", b.room ?? "—"],
               ["Tanggal", fmtDate(day, { weekday: true })],
               ["Jam", `${timeWIB(b.start_at)} – ${timeWIB(b.end_at)} WIB`],

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Icon from "../Icon";
 import { CATEGORY_LABEL, rupiah } from "@/lib/format";
 
-type P = { id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; image_url: string };
+type P = { id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; image_url: string; per_person: boolean; bookable_online: boolean };
 
 const BLURB: Record<string, string> = {
   self_photo: "Foto sendiri di studio, atur pose dan ekspresimu sepuasnya.",
@@ -55,8 +55,10 @@ export default function PackageTabs({ packages, bookingOpen }: { packages: P[]; 
                 </ul>
               )}
               <div className="mt-auto flex items-end justify-between gap-3 pt-6">
-                <p className="font-display text-2xl font-bold tracking-tight text-accent">{rupiah(p.price)}</p>
-                {bookingOpen && <Link href={`/book?paket=${p.id}`} className="btn btn-primary !min-h-10 !rounded-full !px-5">Pilih</Link>}
+                <p className="font-display text-2xl font-bold tracking-tight text-accent">{rupiah(p.price)}<span className="ml-1 text-sm font-semibold text-muted">{p.per_person ? "/ orang" : "/ sesi"}</span></p>
+                {bookingOpen && (p.bookable_online
+                  ? <Link href={`/book?paket=${p.id}`} className="btn btn-primary !min-h-10 !rounded-full !px-5">Pilih</Link>
+                  : <span className="badge badge-amber !px-3 !py-1.5">Langsung datang</span>)}
               </div>
             </div>
           </article>

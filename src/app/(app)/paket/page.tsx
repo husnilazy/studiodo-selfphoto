@@ -6,11 +6,12 @@ import { Badge, Empty, Field, PageHeader, Tabs } from "@/components/ui";
 import { q } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { CATEGORY_LABEL, rupiah } from "@/lib/format";
+import { priceSuffix } from "@/lib/packageUtils";
 import { deleteCatalog, saveAddon, savePackage, saveRoom } from "@/app/actions/catalog";
 
 export const metadata = { title: "Paket & Ruang" };
 
-type Pkg = { image_url: string; id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; active: boolean };
+type Pkg = { per_person: boolean; bookable_online: boolean; option_label: string; options: string; room_ids: number[]; image_url: string; id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; active: boolean };
 type Room = { image_url: string; id: number; name: string; color: string; description: string; active: boolean };
 type Addon = { id: number; name: string; price: number; active: boolean };
 
@@ -18,7 +19,7 @@ export default async function PaketPage({ searchParams }: { searchParams: Promis
   await requireUser(["owner", "admin"]);
   const tab = (await searchParams).tab ?? "paket";
   const [pkgs, rooms, addons] = await Promise.all([
-    q<Pkg>("select * from packages order by active desc, case category when 'self_photo' then 0 when 'photobox' then 1 when 'photobooth' then 2 else 3 end, price"),
+    q<Pkg>("select p.*, coalesce((select array_agg(pr.room_id) from package_rooms pr where pr.package_id = p.id), '{}') as room_ids from packages p order by p.active desc, case p.category when 'self_photo' then 0 when 'photobox' then 1 when 'photobooth' then 2 else 3 end, p.price"),
     q<Room>("select * from rooms order by active desc, sort, id"),
     q<Addon>("select * from addons order by active desc, sort, id"),
   ]);
@@ -36,7 +37,7 @@ export default async function PaketPage({ searchParams }: { searchParams: Promis
         <section>
           <div className="mb-4 flex justify-end">
             <Sheet title="Paket Baru" wide trigger={<button className="btn btn-primary"><Icon name="plus" className="size-4" /> Tambah Paket</button>}>
-              <PackageForm />
+              <PackageForm rooms={rooms} />
             </Sheet>
           </div>
           {pkgs.length === 0 ? <Empty title="Belum ada paket" hint="Tambahkan paket pertama, mis. Self Photo 30 menit." /> : (
@@ -49,11 +50,12 @@ export default async function PaketPage({ searchParams }: { searchParams: Promis
                       {!p.active && <Badge>Nonaktif</Badge>}
                     </div>
                     <p className="font-display mt-2 text-lg font-semibold leading-tight">{p.name}</p>
-                    <p className="font-display tnum mt-1 text-xl font-bold text-accent">{rupiah(p.price)}</p>
+                    <p className="font-display tnum mt-1 text-xl font-bold text-accent">{rupiah(p.price)} <span className="text-sm font-semibold text-muted">{priceSuffix(p)}</span></p>
+                    {!p.bookable_online && <p className="mt-1 text-xs font-semibold text-warn">Walk-in saja (tanpa booking online)</p>}
                     <p className="mt-1 text-xs text-muted">{p.duration_min} menit · maks {p.max_people} orang</p>
                     {p.includes && <p className="mt-2 line-clamp-2 text-xs text-muted">{p.includes}</p>}
                   </button>}>
-                  <PackageForm pkg={p} />
+                  <PackageForm pkg={p} rooms={rooms} />
                 </Sheet>
               ))}
             </div>
@@ -127,7 +129,7 @@ function DeleteRow({ table, id }: { table: "packages" | "rooms" | "addons"; id: 
   );
 }
 
-function PackageForm({ pkg }: { pkg?: Pkg }) {
+function PackageForm({ pkg, rooms }: { pkg?: Pkg; rooms: Room[] }) {
   return (
     <>
       <ActionForm action={savePackage.bind(null, pkg?.id ?? null)}>
@@ -139,12 +141,38 @@ function PackageForm({ pkg }: { pkg?: Pkg }) {
             </select>
           </Field>
           <Field label="Harga"><MoneyInput name="price" defaultValue={pkg?.price} required /></Field>
+          <Field label="Dihitung">
+            <select name="pricing" className="input" defaultValue={pkg?.per_person ? "per_person" : "per_sesi"}>
+              <option value="per_sesi">Per sesi / paket</option>
+              <option value="per_person">Per orang (× jumlah orang)</option>
+            </select>
+          </Field>
           <Field label="Durasi (menit)"><input name="duration_min" inputMode="numeric" className="input" required defaultValue={pkg?.duration_min ?? 30} /></Field>
           <Field label="Maks. orang"><input name="max_people" inputMode="numeric" className="input" defaultValue={pkg?.max_people ?? 2} /></Field>
         </div>
         <Field label="Termasuk (opsional)"><textarea name="includes" className="input" defaultValue={pkg?.includes} placeholder="mis. 1 cetak 4R, semua soft file" /></Field>
         <Field label="Deskripsi (opsional, tampil di website)"><textarea name="description" className="input" defaultValue={pkg?.description} /></Field>
         <Field label="Link foto (opsional)" hint="Tempel link gambar (https://…) untuk tampil di website."><input name="image_url" type="url" className="input" defaultValue={pkg?.image_url} /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Nama pilihan (opsional)" hint="mis. Warna background, Tema"><input name="option_label" className="input" defaultValue={pkg?.option_label} placeholder="Warna background" /></Field>
+          <Field label="Daftar pilihan" hint="Satu per baris"><textarea name="options" className="input !min-h-[4.5rem]" defaultValue={pkg?.options} placeholder={"Soft Pink\nAesthetic Beige\nWarm Grey"} /></Field>
+        </div>
+        {rooms.length > 0 && (
+          <fieldset>
+            <legend className="label">Boleh dipakai di ruang (kosong = semua ruang)</legend>
+            <div className="flex flex-wrap gap-2">
+              {rooms.filter((r) => r.active || pkg?.room_ids.includes(r.id)).map((r) => (
+                <label key={r.id} className="chip cursor-pointer gap-2 has-[:checked]:!border-transparent has-[:checked]:!bg-accent has-[:checked]:!text-accentfg">
+                  <input type="checkbox" name="room_ids" value={r.id} defaultChecked={pkg?.room_ids.includes(r.id)} className="sr-only" />
+                  <span className="size-2.5 rounded-full" style={{ background: r.color }} />{r.name}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
+        <label className="flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" name="bookable_online" defaultChecked={pkg?.bookable_online ?? true} className="size-5 accent-[var(--accent)]" /> Bisa dipesan online (hilangkan centang untuk paket walk-in saja)
+        </label>
         <ActiveToggle on={pkg?.active ?? true} />
       </ActionForm>
       {pkg && <DeleteRow table="packages" id={pkg.id} />}

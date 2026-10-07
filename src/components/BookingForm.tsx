@@ -6,14 +6,15 @@ import MoneyInput from "./MoneyInput";
 import Icon from "./Icon";
 import { createBooking, updateBooking } from "@/app/actions/bookings";
 import { CATEGORY_LABEL, METHOD_LABEL, SOURCE_LABEL, addMin, rupiah } from "@/lib/format";
+import { packageTotal, parseOptions, priceSuffix, roomAllowed, unitsFor } from "@/lib/packageUtils";
 
-type Pkg = { id: number; name: string; category: string; price: number; duration_min: number; max_people: number };
+type Pkg = { id: number; name: string; category: string; price: number; duration_min: number; max_people: number; per_person: boolean; option_label: string; options: string; room_ids: number[] };
 type Room = { id: number; name: string; color: string };
 type Addon = { id: number; name: string; price: number };
 export type BookingInit = {
   id: number; customer: { id: number; name: string; phone: string }; package_id: number | null; room_id: number | null;
   date: string; time: string; people: number; source: string; discount: number; notes: string;
-  addons: Record<number, number>; custom_name: string; custom_price: number;
+  addons: Record<number, number>; custom_name: string; custom_price: number; option_choice: string;
 };
 type Busy = { code: string; start: string; end: string };
 
@@ -34,6 +35,7 @@ export default function BookingForm({
   const [date, setDate] = useState(booking?.date ?? today);
   const [time, setTime] = useState(booking?.time ?? (walkin ? nowTime : ""));
   const [people, setPeople] = useState(booking?.people ?? 1);
+  const [option, setOption] = useState(booking?.option_choice ?? "");
   const [qty, setQty] = useState<Record<number, number>>(booking?.addons ?? {});
   const [discount, setDiscount] = useState(booking?.discount ?? 0);
   const [customPrice, setCustomPrice] = useState(booking?.custom_price ?? 0);
@@ -67,7 +69,7 @@ export default function BookingForm({
   };
   const myClash = time ? clash(time) : undefined;
 
-  const subtotal = (pkg?.price ?? 0)
+  const subtotal = (pkg ? packageTotal(pkg, people) : 0)
     + addons.reduce((s, a) => s + (qty[a.id] ?? 0) * a.price, 0) + customPrice;
   const disc = Math.min(discount, subtotal);
   const total = subtotal - disc;
@@ -93,13 +95,17 @@ export default function BookingForm({
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {g.items.map((p) => (
                   <label key={p.id} className="cursor-pointer">
-                    <input type="radio" name="package_id" value={p.id} checked={pkgId === p.id} onChange={() => { setPkgId(p.id); setPeople((c) => Math.min(c, p.max_people)); }} className="peer sr-only" />
+                    <input type="radio" name="package_id" value={p.id} checked={pkgId === p.id} onChange={() => {
+                      setPkgId(p.id); setPeople((c) => Math.min(c, p.max_people)); setOption("");
+                      const ok = p.room_ids.length ? rooms.filter((r) => p.room_ids.includes(r.id)) : rooms;
+                      setRoomId((cur) => (cur !== "" && ok.some((r) => r.id === cur) ? cur : (ok[0]?.id ?? "")));
+                    }} className="peer sr-only" />
                     <span className="flex h-full flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-line bg-panel p-3 transition peer-checked:border-accent peer-checked:bg-accentsoft peer-focus-visible:ring-2 peer-focus-visible:ring-accent">
                       <span className="min-w-0">
                         <span className="block font-semibold leading-tight">{p.name}</span>
                         <span className="block text-xs text-muted">{p.duration_min} menit · maks {p.max_people} orang</span>
                       </span>
-                      <span className="tnum shrink-0 font-bold text-accent">{rupiah(p.price)}</span>
+                      <span className="tnum shrink-0 font-bold text-accent">{rupiah(p.price)}<span className="text-xs font-semibold text-muted"> {priceSuffix(p)}</span></span>
                     </span>
                   </label>
                 ))}
@@ -122,11 +128,25 @@ export default function BookingForm({
             </label>
           </div>
 
+          {pkg && parseOptions(pkg.options).length > 0 && (
+            <div className="mt-4">
+              <span className="label">{pkg.option_label || "Pilihan"}</span>
+              <div className="flex flex-wrap gap-2">
+                {parseOptions(pkg.options).map((o) => (
+                  <label key={o} className="cursor-pointer">
+                    <input type="radio" name="option_choice" value={o} checked={option === o} onChange={() => setOption(o)} className="peer sr-only" />
+                    <span className="chip peer-checked:!border-transparent peer-checked:!bg-accent peer-checked:!text-accentfg">{o}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           {rooms.length > 0 && (
             <div className="mt-4">
               <span className="label">Ruang / background</span>
               <div className="flex flex-wrap gap-2">
-                {rooms.map((r) => (
+                {rooms.filter((r) => !pkg || roomAllowed(pkg, r.id)).map((r) => (
                   <label key={r.id} className="cursor-pointer">
                     <input type="radio" name="room_id" value={r.id} checked={roomId === r.id} onChange={() => setRoomId(r.id)} className="peer sr-only" />
                     <span className="chip gap-2 peer-checked:!border-transparent peer-checked:!bg-accent peer-checked:!text-accentfg">
@@ -134,10 +154,10 @@ export default function BookingForm({
                     </span>
                   </label>
                 ))}
-                <label className="cursor-pointer">
+                {(!pkg || pkg.room_ids.length === 0) && <label className="cursor-pointer">
                   <input type="radio" name="room_id" value="" checked={roomId === ""} onChange={() => setRoomId("")} className="peer sr-only" />
                   <span className="chip peer-checked:!border-transparent peer-checked:!bg-accent peer-checked:!text-accentfg">Tanpa ruang</span>
-                </label>
+                </label>}
               </div>
             </div>
           )}
@@ -208,7 +228,7 @@ export default function BookingForm({
         <div className="card p-4">
           <p className="font-display mb-3 font-semibold">Ringkasan</p>
           <dl className="space-y-1.5 text-sm">
-            <Row k={pkg?.name ?? "Paket"} v={rupiah(pkg?.price ?? 0)} />
+            <Row k={pkg ? (pkg.per_person ? `${pkg.name} × ${unitsFor(pkg, people)} orang` : pkg.name) : "Paket"} v={rupiah(pkg ? packageTotal(pkg, people) : 0)} />
             {addons.filter((a) => (qty[a.id] ?? 0) > 0).map((a) => <Row key={a.id} k={`${a.name} ×${qty[a.id]}`} v={rupiah(a.price * qty[a.id])} />)}
             {customPrice > 0 && <Row k="Item tambahan" v={rupiah(customPrice)} />}
             {disc > 0 && <Row k="Diskon" v={`− ${rupiah(disc)}`} tone="text-ok" />}

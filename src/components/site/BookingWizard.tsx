@@ -6,8 +6,9 @@ import Icon from "../Icon";
 import { createPublicBooking } from "@/app/actions/public";
 import { CATEGORY_LABEL, addDays, addMin, fmtDate, rupiah } from "@/lib/format";
 import { roomGradient } from "@/lib/siteUtils";
+import { packageTotal, parseOptions, priceSuffix, roomAllowed, unitsFor } from "@/lib/packageUtils";
 
-type Pkg = { id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; image_url: string };
+type Pkg = { id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; image_url: string; per_person: boolean; option_label: string; options: string; room_ids: number[] };
 type Room = { id: number; name: string; color: string; description: string; image_url: string };
 type Addon = { id: number; name: string; price: number };
 type Slot = { t: string; rooms: number[] };
@@ -30,6 +31,7 @@ export default function BookingWizard({
   const [time, setTime] = useState("");
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [people, setPeople] = useState(1);
+  const [option, setOption] = useState("");
   const [qty, setQty] = useState<Record<number, number>>({});
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -41,7 +43,7 @@ export default function BookingWizard({
   const top = useRef<HTMLDivElement>(null);
 
   const pkg = packages.find((p) => p.id === pkgId) ?? null;
-  const total = (pkg?.price ?? 0) + addons.reduce((s, a) => s + (qty[a.id] ?? 0) * a.price, 0);
+  const total = (pkg ? packageTotal(pkg, people) : 0) + addons.reduce((s, a) => s + (qty[a.id] ?? 0) * a.price, 0);
   const dp = Math.round((total * dpPercent) / 100);
 
   // Hari yang bisa dipilih (maks 45 hari ke depan dalam strip).
@@ -71,7 +73,7 @@ export default function BookingWizard({
 
   const canNext = [
     !!pkg,
-    !!pkg && !!time,
+    !!pkg && !!time && (!pkg || parseOptions(pkg.options).length === 0 || !!option),
     name.trim().length >= 2 && phone.replace(/\D/g, "").length >= 9,
     true,
   ][step];
@@ -82,7 +84,7 @@ export default function BookingWizard({
     const fd = new FormData();
     fd.set("package_id", String(pkg.id)); fd.set("date", date); fd.set("time", time);
     if (roomId) fd.set("room_id", String(roomId));
-    fd.set("people", String(people)); fd.set("name", name); fd.set("phone", phone); fd.set("notes", notes); fd.set("website", hp);
+    fd.set("people", String(people)); if (option) fd.set("option_choice", option); fd.set("name", name); fd.set("phone", phone); fd.set("notes", notes); fd.set("website", hp);
     for (const [id, q] of Object.entries(qty)) if (q > 0) fd.set(`addon_${id}`, String(q));
     const r = await createPublicBooking(fd);
     if (r.ok) { router.push(r.redirect); return; }
@@ -122,13 +124,16 @@ export default function BookingWizard({
                   {g.items.map((p) => {
                     const on = p.id === pkgId;
                     return (
-                      <button key={p.id} type="button" onClick={() => { setPkgId(p.id); setPeople((c) => Math.min(c, p.max_people)); }}
+                      <button key={p.id} type="button" onClick={() => {
+                        setPkgId(p.id); setPeople((c) => Math.min(c, p.max_people)); setOption("");
+                        setRoomId((cur) => (cur === null || roomAllowed(p, cur) ? cur : null));
+                      }}
                         className={`glass lift relative overflow-hidden rounded-2xl p-5 text-left ${on ? "!border-accent ring-2 ring-accent/40" : ""}`}>
                         {on && <span className="pop-in absolute right-3 top-3 grid size-6 place-items-center rounded-full bg-accent text-accentfg"><Icon name="check" className="size-4" /></span>}
                         <p className="font-display pr-8 text-lg font-semibold leading-tight">{p.name}</p>
                         <p className="mt-1 text-sm text-muted">{p.duration_min} menit · hingga {p.max_people} orang</p>
                         {(p.description || p.includes) && <p className="mt-2 line-clamp-2 text-sm text-muted">{p.description || p.includes}</p>}
-                        <p className="font-display mt-3 text-xl font-bold text-accent">{rupiah(p.price)}</p>
+                        <p className="font-display mt-3 text-xl font-bold text-accent">{rupiah(p.price)} <span className="text-sm font-semibold text-muted">{priceSuffix(p)}</span></p>
                       </button>
                     );
                   })}
@@ -141,12 +146,34 @@ export default function BookingWizard({
         {step === 1 && pkg && (
           <section>
             <Heading t="Background & jadwal" d={`${pkg.name} · ${pkg.duration_min} menit`} />
+            <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div>
+                <p className="mb-3 text-sm font-bold">Jumlah orang{pkg.per_person && <span className="font-normal text-muted"> · {rupiah(pkg.price)} / orang</span>}</p>
+                <div className="flex items-center gap-3">
+                  <Stepper onClick={() => setPeople((p) => Math.max(1, p - 1))}>−</Stepper>
+                  <span className="font-display w-10 text-center text-2xl font-semibold">{people}</span>
+                  <Stepper onClick={() => setPeople((p) => Math.min(pkg.max_people, p + 1))}>+</Stepper>
+                  <span className="text-sm text-muted">maks {pkg.max_people}</span>
+                </div>
+                {pkg.per_person && <p className="mt-2 text-sm font-semibold text-accent">Subtotal {rupiah(packageTotal(pkg, people))}</p>}
+              </div>
+              {parseOptions(pkg.options).length > 0 && (
+                <div>
+                  <p className="mb-3 text-sm font-bold">{pkg.option_label || "Pilihan"}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {parseOptions(pkg.options).map((o) => (
+                      <button key={o} type="button" className="chip !min-h-11 !px-5" data-on={option === o} onClick={() => setOption(o)}>{o}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             {rooms.length > 0 && (
               <div className="mb-8">
                 <p className="mb-3 text-sm font-bold">Background / tema</p>
                 <div className="hscroll -mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
                   <RoomCard on={roomId === null} onClick={() => setRoomId(null)} name="Bebas" sub="Kami pilihkan yang kosong" bg="linear-gradient(135deg, var(--accent), var(--accent-2))" />
-                  {rooms.map((r) => <RoomCard key={r.id} on={roomId === r.id} onClick={() => setRoomId(r.id)} name={r.name} sub={r.description} bg={roomGradient(r.color)} img={r.image_url} />)}
+                  {rooms.filter((r) => roomAllowed(pkg, r.id)).map((r) => <RoomCard key={r.id} on={roomId === r.id} onClick={() => setRoomId(r.id)} name={r.name} sub={r.description} bg={roomGradient(r.color)} img={r.image_url} />)}
                 </div>
               </div>
             )}
@@ -195,15 +222,6 @@ export default function BookingWizard({
             <div className="glass space-y-4 rounded-3xl p-5 sm:p-7">
               <label className="block"><span className="label">Nama lengkap</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="mis. Dewi Lestari" /></label>
               <label className="block"><span className="label">Nomor WhatsApp</span><input className="input" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" placeholder="08xxxxxxxxxx" /></label>
-              <div>
-                <span className="label">Jumlah orang</span>
-                <div className="flex items-center gap-3">
-                  <Stepper onClick={() => setPeople((p) => Math.max(1, p - 1))}>−</Stepper>
-                  <span className="font-display w-10 text-center text-2xl font-semibold">{people}</span>
-                  <Stepper onClick={() => setPeople((p) => Math.min(pkg.max_people, p + 1))}>+</Stepper>
-                  <span className="text-sm text-muted">maks {pkg.max_people}</span>
-                </div>
-              </div>
               <label className="block"><span className="label">Catatan (opsional)</span><textarea className="input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Tema, permintaan khusus, dll." /></label>
               <input tabIndex={-1} autoComplete="off" aria-hidden className="absolute -left-[9999px] h-0 w-0 opacity-0" name="website" value={hp} onChange={(e) => setHp(e.target.value)} />
             </div>
@@ -233,7 +251,8 @@ export default function BookingWizard({
             <Heading t="Periksa & kirim" d="Pastikan semuanya sudah benar." />
             <div className="glass rounded-3xl p-5 sm:p-7">
               <dl className="space-y-3 text-sm">
-                <Row k="Layanan" v={pkg.name} />
+                <Row k="Layanan" v={pkg.per_person ? `${pkg.name} × ${unitsFor(pkg, people)} orang` : pkg.name} />
+                {option && <Row k={pkg.option_label || "Pilihan"} v={option} />}
                 <Row k="Background" v={roomName ?? "—"} />
                 <Row k="Tanggal" v={fmtDate(date, { weekday: true })} />
                 <Row k="Jam" v={`${time} – ${addMin(time, pkg.duration_min)} WIB`} />

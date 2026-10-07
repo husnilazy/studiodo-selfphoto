@@ -4,7 +4,7 @@ import { getStudio } from "./data";
 import { getOnline } from "./online";
 import { getSiteConfig } from "./siteServer";
 
-export type SitePackage = { id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; image_url: string };
+export type SitePackage = { id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; image_url: string; per_person: boolean; bookable_online: boolean; option_label: string; options: string; room_ids: number[] };
 export type SiteRoom = { id: number; name: string; color: string; description: string; image_url: string };
 export type SiteAddon = { id: number; name: string; price: number };
 
@@ -14,8 +14,10 @@ export async function getSiteData() {
     getOnline(),
     getSiteConfig(),
     q<SitePackage>(
-      `select id, name, category, description, includes, price, duration_min, max_people, image_url from packages where active
-        order by case category when 'self_photo' then 0 when 'photobox' then 1 when 'photobooth' then 2 else 3 end, price`),
+      `select p.id, p.name, p.category, p.description, p.includes, p.price, p.duration_min, p.max_people, p.image_url, p.per_person, p.bookable_online, p.option_label, p.options,
+        coalesce((select array_agg(pr.room_id order by pr.room_id) from package_rooms pr where pr.package_id = p.id), '{}') as room_ids
+       from packages p where p.active
+        order by case p.category when 'self_photo' then 0 when 'photobox' then 1 when 'photobooth' then 2 else 3 end, p.price`),
     q<SiteRoom>("select id, name, color, description, image_url from rooms where active order by sort, id"),
     q<SiteAddon>("select id, name, price from addons where active order by sort, id"),
   ]);

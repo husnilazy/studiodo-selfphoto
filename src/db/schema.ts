@@ -1,7 +1,7 @@
 // Skema database STUDIODO Kasir (PostgreSQL / Supabase). Idempotent: aman dijalankan berulang.
 // Semua nilai uang disimpan sebagai bigint rupiah (tanpa desimal).
 // NAIKKAN versi ini setiap kali SCHEMA diubah agar database yang sudah ada ikut ter-upgrade.
-export const SCHEMA_VERSION = "2026-10-07.1";
+export const SCHEMA_VERSION = "2026-10-07.2";
 
 export const SCHEMA = `
 create table if not exists users (
@@ -223,6 +223,19 @@ alter table customer_files add column if not exists drive_file_id text;
 
 -- Website & booking online
 alter table rooms add column if not exists image_url text not null default '';
+
+-- Harga per orang, paket khusus walk-in, pilihan varian (warna/tema), dan pembatasan ruang per paket
+alter table packages add column if not exists per_person boolean not null default false;
+alter table packages add column if not exists bookable_online boolean not null default true;
+alter table packages add column if not exists option_label text not null default '';
+alter table packages add column if not exists options text not null default '';
+alter table bookings add column if not exists option_choice text not null default '';
+create table if not exists package_rooms (
+  package_id int not null references packages(id) on delete cascade,
+  room_id int not null references rooms(id) on delete cascade,
+  primary key (package_id, room_id)
+);
+alter table package_rooms enable row level security;
 alter table packages add column if not exists image_url text not null default '';
 
 -- Monitoring sesi live

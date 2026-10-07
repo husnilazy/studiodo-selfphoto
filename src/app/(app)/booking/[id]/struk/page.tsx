@@ -12,8 +12,8 @@ export default async function Receipt({ params }: { params: Promise<{ id: string
   await requireUser();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const [b] = await q<{ code: string; start_at: string; end_at: string; total: number; discount: number; customer: string; room: string | null; cashier: string | null }>(
-    `select b.code, b.start_at, b.end_at, b.total, b.discount, c.name as customer, r.name as room, u.name as cashier
+  const [b] = await q<{ code: string; start_at: string; end_at: string; total: number; discount: number; customer: string; room: string | null; cashier: string | null; option_choice: string }>(
+    `select b.code, b.start_at, b.end_at, b.total, b.discount, b.option_choice, c.name as customer, r.name as room, u.name as cashier
        from bookings b join customers c on c.id = b.customer_id left join rooms r on r.id = b.room_id left join users u on u.id = b.created_by where b.id = $1`, [id]);
   if (!b) notFound();
   const [items, pays, studio] = await Promise.all([
@@ -40,6 +40,7 @@ export default async function Receipt({ params }: { params: Promise<{ id: string
         <p>Tgl: {fmtDate(dateWIB(b.start_at), { short: true })} {timeWIB(b.start_at)}–{timeWIB(b.end_at)}</p>
         <p>Cust: {b.customer}</p>
         {b.room && <p>Ruang: {b.room}</p>}
+        {b.option_choice && <p>Pilihan: {b.option_choice}</p>}
         {b.cashier && <p>Kasir: {b.cashier}</p>}
         <hr className="my-3 border-dashed border-line" />
         {items.map((i, k) => (
