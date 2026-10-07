@@ -1,5 +1,5 @@
 import "server-only";
-import { SCHEMA } from "@/db/schema";
+import { SCHEMA, SCHEMA_VERSION } from "@/db/schema";
 
 // Satu antarmuka untuk dua mesin:
 //  - DATABASE_URL terisi  -> PostgreSQL sungguhan (Supabase) lewat `pg`
@@ -23,6 +23,9 @@ async function createPg(url: string): Promise<Engine> {
   const pool = new pg.Pool({
     connectionString: url,
     max: 3,
+    connectionTimeoutMillis: 10_000,
+    idleTimeoutMillis: 30_000,
+    keepAlive: true,
     ssl: local ? undefined : { rejectUnauthorized: false },
   });
   const q: Q = async (sql, params) => (await pool.query(sql, params)).rows;
@@ -72,8 +75,16 @@ async function createLite(): Promise<Engine> {
 async function boot(): Promise<Engine> {
   const url = process.env.DATABASE_URL?.trim();
   const e = url ? await createPg(url) : await createLite();
-  // Skema idempotent: dijalankan tiap cold start agar kolom/tabel baru otomatis ikut ter-upgrade.
-  await e.exec(SCHEMA);
+  // Skema idempotent, tapi hanya dijalankan bila versinya berubah (1 query saat cold start, bukan puluhan).
+  let current = false;
+  try {
+    const r = await e.q<{ value: string }>("select value from settings where key = 'schema_v'");
+    current = r[0]?.value === SCHEMA_VERSION;
+  } catch { /* tabel belum ada: database baru */ }
+  if (!current) {
+    await e.exec(SCHEMA);
+    await e.q("insert into settings (key, value) values ('schema_v', $1::jsonb) on conflict (key) do update set value = excluded.value", [JSON.stringify(SCHEMA_VERSION)]);
+  }
   return e;
 }
 

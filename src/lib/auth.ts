@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
@@ -41,7 +42,8 @@ export async function endSession() {
   (await cookies()).delete(COOKIE);
 }
 
-export async function currentUser(): Promise<User | null> {
+/** Dibungkus cache(): layout + halaman + komponen memakai satu query per request, bukan tiga. */
+export const currentUser = cache(async function currentUser(): Promise<User | null> {
   const raw = (await cookies()).get(COOKIE)?.value;
   if (!raw) return null;
   const [id, exp, sig] = raw.split(".");
@@ -50,7 +52,7 @@ export async function currentUser(): Promise<User | null> {
   if (sig.length !== expect.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expect))) return null;
   if (Number(exp) < Date.now() / 1000) return null;
   return one<User>("select id, name, role from users where id = $1 and active", [Number(id)]);
-}
+});
 
 /** Wajib login (dan role tertentu). Dipakai di setiap halaman & server action. */
 export async function requireUser(roles?: Role[]): Promise<User> {

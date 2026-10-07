@@ -18,7 +18,10 @@ export async function getOnline(): Promise<Online> {
 }
 
 /** Booking online yang belum dibayar & melewati batas tahan otomatis dibatalkan agar slot terbuka lagi. */
+let lastExpire = 0;
 export async function expireStalePending() {
+  if (Date.now() - lastExpire < 30_000) return; // cukup tiap 30 detik per instance
+  lastExpire = Date.now();
   const o = await getOnline();
   if (o.hold_min <= 0) return;
   await q(
