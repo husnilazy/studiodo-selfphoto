@@ -1,11 +1,29 @@
-import Icon from "./Icon";
-import BrandMark from "./site/BrandMark";
+﻿import Icon from "./Icon";
+import { imageSrc } from "@/lib/siteConfig";
 import type { FontKey } from "@/lib/siteConfig";
 
 export type CardBrand = { name: string; logo: string; logoDark: string; height: number; text: string; textSize: number; textFont: FontKey; accent: string; accent2: string };
 
+/** Logo studio untuk latar gelap (depan) atau terang (belakang): pakai versi yang cocok, jika tidak ada dibungkus pill kontras. */
+function CardLogo({ brand, on }: { brand: CardBrand; on: "dark" | "light" }) {
+  const own = on === "dark" ? brand.logoDark : brand.logo;
+  const other = on === "dark" ? brand.logo : brand.logoDark;
+  const src = own || other;
+  const extra = brand.text ? <span className="whitespace-nowrap text-[3.6cqw] font-semibold leading-none">{brand.text}</span> : null;
+  if (!src) {
+    return <span className="inline-flex items-center gap-[2cqw] text-[5.2cqw] font-extrabold leading-none tracking-tight" style={{ fontFamily: "var(--font-sora), system-ui, sans-serif" }}>{brand.name}{extra}</span>;
+  }
+  const img = (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={imageSrc(src)} alt={brand.name} className="h-[10.5cqw] max-w-[38cqw] w-auto object-contain" />
+  );
+  // Logo versi sendiri tampil polos; logo versi sebaliknya diberi pill agar tetap terbaca.
+  if (own) return <span className="inline-flex items-center gap-[2cqw]">{img}{extra}</span>;
+  return <span className={`inline-flex items-center gap-[2cqw] rounded-[1.6cqw] px-[2.2cqw] py-[1.1cqw] ${on === "dark" ? "bg-white/95 text-[#0b1020]" : "bg-[#0b1020] text-white"}`}>{img}{extra}</span>;
+}
+
 /**
- * Kartu member ukuran 4R/2 (102 × 76 mm). Semua ukuran memakai satuan cqw sehingga proporsinya sama
+ * Kartu member ukuran 4R/2 (102 Ã— 76 mm). Semua ukuran memakai satuan cqw sehingga proporsinya sama
  * di layar, di HP, maupun saat dicetak.
  */
 export default function MemberCardView({ side, brand, name, code, tier, since, qrSvg, host, stamps }: {
@@ -20,9 +38,7 @@ export default function MemberCardView({ side, brand, name, code, tier, since, q
         <div aria-hidden className="absolute -bottom-[26cqw] -left-[10cqw] size-[56cqw] rounded-full bg-black/15" />
         <div className="relative flex h-full flex-col justify-between p-[5.5cqw]">
           <div className="flex items-start justify-between gap-[3cqw]">
-            <span className="inline-flex items-center rounded-[1.6cqw] bg-white/95 px-[2.4cqw] py-[1.2cqw] text-[#0b1020]">
-              <BrandMark name={brand.name} logo={brand.logo} logoDark="" height={Math.round(Math.min(brand.height, 36) * 0.62)} text={brand.text} textSize={Math.max(8, Math.round(brand.textSize * 0.62))} textFont={brand.textFont} />
-            </span>
+            <CardLogo brand={brand} on="dark" />
             <span className="rounded-full bg-white/20 px-[3cqw] py-[1cqw] text-[3.2cqw] font-bold uppercase tracking-[.18em] backdrop-blur">{tier || "Member"}</span>
           </div>
           <div className="flex items-end justify-between gap-[3cqw]">
@@ -52,9 +68,10 @@ export default function MemberCardView({ side, brand, name, code, tier, since, q
         <div className="flex items-end justify-between">
           <div>
             <p className="text-[4.4cqw] font-extrabold leading-none tracking-tight">KARTU STEMPEL</p>
-            <p className="mt-[1cqw] text-[2.7cqw] text-[#667089]">Stempel tiap sesi · {stamps.rewardLabel}</p>
+            <p className="mt-[1cqw] text-[2.7cqw] text-[#667089]">Stempel tiap sesi Â· {stamps.rewardLabel}</p>
+            <p className="mt-[0.8cqw] font-mono text-[2.8cqw] font-bold tracking-widest text-[#667089]">{code}</p>
           </div>
-          <p className="font-mono text-[3cqw] font-bold tracking-widest text-[#667089]">{code}</p>
+          <CardLogo brand={brand} on="light" />
         </div>
         <div className="mt-[3cqw] grid flex-1 gap-[2cqw]" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridAutoRows: `${rowH}cqw`, alignContent: "center" }}>
           {Array.from({ length: stamps.total }).map((_, i) => {
