@@ -23,7 +23,8 @@ export default function PinPad({
 
   async function submit(p: string) {
     setBusy(true);
-    const e = await onComplete(p);
+    let e: string | null;
+    try { e = await onComplete(p); } catch { e = "Terjadi gangguan pada server. Coba lagi sebentar."; }
     setBusy(false);
     if (e) {
       setErr(e); setShake(true);

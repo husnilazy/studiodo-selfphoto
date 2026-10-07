@@ -4,10 +4,27 @@ import { endSession, hashPin, hasUsers, startSession, verifyPin } from "@/lib/au
 
 type Result = { ok: true } | { ok: false; error: string };
 
+/** Pesan galat yang ramah; konfigurasi server yang kurang disebut jelas agar mudah diperbaiki. */
+function friendly(e: unknown) {
+  const m = e instanceof Error ? e.message : "";
+  if (/SESSION_SECRET/.test(m)) return "Server belum dikonfigurasi: isi SESSION_SECRET di Environment Variables Vercel lalu Redeploy. Akun Anda sudah tersimpan, tinggal login.";
+  if (/ECONN|ENOTFOUND|timeout|password authentication|DATABASE/i.test(m)) return "Tidak bisa terhubung ke database. Periksa DATABASE_URL di server.";
+  return "Terjadi gangguan pada server. Coba lagi sebentar.";
+}
+
 const MAX_FAILS = 5;
 const LOCK_MIN = 5;
 
 export async function loginAction(userId: number, pin: string): Promise<Result> {
+  try {
+    return await doLogin(userId, pin);
+  } catch (e) {
+    console.error(e);
+    return { ok: false, error: friendly(e) };
+  }
+}
+
+async function doLogin(userId: number, pin: string): Promise<Result> {
   if (!/^\d{6}$/.test(pin)) return { ok: false, error: "PIN harus 6 digit." };
   const u = await one<{ id: number; pin_hash: string; failed_attempts: number; locked_until: string | null }>(
     "select id, pin_hash, failed_attempts, locked_until from users where id = $1 and active", [userId]);
@@ -36,6 +53,15 @@ export async function logoutAction() {
 
 /** Pembuatan owner pertama. Hanya bisa jika belum ada pengguna sama sekali. */
 export async function setupOwnerAction(name: string, pin: string): Promise<Result> {
+  try {
+    return await doSetup(name, pin);
+  } catch (e) {
+    console.error(e);
+    return { ok: false, error: friendly(e) };
+  }
+}
+
+async function doSetup(name: string, pin: string): Promise<Result> {
   if (await hasUsers()) return { ok: false, error: "Setup sudah dilakukan." };
   name = name.trim();
   if (!name) return { ok: false, error: "Nama wajib diisi." };
