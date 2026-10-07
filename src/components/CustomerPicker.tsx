@@ -8,13 +8,14 @@ type C = { id: number; name: string; phone: string };
  * Cari customer lama atau isi customer baru.
  * Mengirim: customer_id (jika dipilih) atau new_name + new_phone (jika baru).
  */
-export default function CustomerPicker({ allowNew = true, initial }: { allowNew?: boolean; initial?: C | null }) {
+export default function CustomerPicker({ allowNew = true, initial, onSelect, onPhone }: { allowNew?: boolean; initial?: C | null; onSelect?: (c: C | null) => void; onPhone?: (p: string) => void }) {
   const [sel, setSel] = useState<C | null>(initial ?? null);
   const [term, setTerm] = useState("");
   const [rows, setRows] = useState<C[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const seq = useRef(0);
+  useEffect(() => { onSelect?.(sel); }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) return;
@@ -71,7 +72,7 @@ export default function CustomerPicker({ allowNew = true, initial }: { allowNew?
           <p className="mb-2 text-xs font-semibold text-muted">…atau customer baru</p>
           <div className="grid grid-cols-2 gap-2">
             <input name="new_name" className="input" placeholder="Nama" />
-            <input name="new_phone" className="input" inputMode="tel" placeholder="No. WhatsApp" />
+            <input name="new_phone" className="input" inputMode="tel" placeholder="No. WhatsApp" onChange={(e) => onPhone?.(e.target.value)} />
           </div>
         </div>
       )}

@@ -6,6 +6,8 @@ import { bool, int, req, safe, str } from "@/lib/action";
 import { allocateRevenue, METHOD_ACCOUNT, postJournal, voidJournal } from "@/lib/ledger";
 import { dateWIB, fromWIB, rupiah } from "@/lib/format";
 import { checkConflict, genCode } from "@/lib/bookingUtils";
+import { buildQuote } from "@/lib/pricingServer";
+import type { DiscountLine } from "@/lib/pricing";
 import { parseOptions, roomAllowed, unitsFor } from "@/lib/packageUtils";
 import type { ActionState } from "@/components/ActionForm";
 
@@ -34,7 +36,7 @@ async function resolveCustomer(q: Q, fd: FormData): Promise<number> {
 
 type ItemInput = { kind: "package" | "addon" | "custom"; ref_id: number | null; name: string; qty: number; unit_price: number; category: string };
 
-async function buildItems(q: Q, fd: FormData, roomId: number | null) {
+async function buildItems(q: Q, fd: FormData, roomId: number | null, ctx: { customerId?: number | null; existing?: { id: number; discount: number; detail: DiscountLine[] } }) {
   const items: ItemInput[] = [];
   const pkgId = int(fd, "package_id");
   const people = Math.max(1, int(fd, "people"));
@@ -68,9 +70,21 @@ async function buildItems(q: Q, fd: FormData, roomId: number | null) {
   const cName = str(fd, "custom_name"), cPrice = int(fd, "custom_price");
   if (cName && cPrice > 0) items.push({ kind: "custom", ref_id: null, name: cName, qty: 1, unit_price: cPrice, category: "lainnya" });
   if (items.length === 0) throw new Error("Pilih paket atau tambahkan minimal satu item.");
-  const subtotal = items.reduce((s, i) => s + i.qty * i.unit_price, 0);
-  const discount = Math.min(Math.max(0, int(fd, "discount")), subtotal);
-  return { items, subtotal, discount, total: subtotal - discount, duration, pkgId: pkgId || null, pkgName, option };
+  const extras = items.filter((i) => i.kind !== "package").reduce((s, i) => s + i.qty * i.unit_price, 0);
+  const manual = Math.max(0, int(fd, "discount"));
+  let lines: DiscountLine[], discount: number, total: number, voucherId: number | null = null, voucherAmount = 0;
+  if (ctx.existing) {
+    // Edit: harga tidak dihitung ulang dari promo (bisa saja sudah berakhir); kolom diskon = total potongan.
+    const subtotal = items.reduce((s, i) => s + i.qty * i.unit_price, 0);
+    discount = Math.min(manual, subtotal); total = subtotal - discount;
+    lines = discount === ctx.existing.discount ? ctx.existing.detail : discount > 0 ? [{ type: "manual", label: "Diskon manual", amount: discount }] : [];
+  } else {
+    const qr = await buildQuote(q, { packageId: pkgId || null, people, extras, customerId: ctx.customerId, voucherCode: str(fd, "voucher_code"), manual, auto: bool(fd, "auto_promo") });
+    if (qr.voucherError) throw new Error(qr.voucherError);
+    lines = qr.lines; discount = qr.discount; total = qr.total;
+    if (qr.voucher) { voucherId = qr.voucher.id; voucherAmount = qr.lines.find((l) => l.type === "voucher")?.amount ?? 0; }
+  }
+  return { items, discount, total, lines, voucherId, voucherAmount, duration, pkgId: pkgId || null, pkgName, option };
 }
 
 /** Mencatat pembayaran + jurnalnya (kas bertambah, pendapatan diakui — metode kas). */
@@ -120,15 +134,16 @@ export async function createBooking(_p: ActionState, fd: FormData) {
 
     const id = await tx(async (q) => {
       const customerId = await resolveCustomer(q, fd);
-      const b = await buildItems(q, fd, roomId);
+      const b = await buildItems(q, fd, roomId, { customerId });
       const end = new Date(start.getTime() + b.duration * 60000);
       await checkConflict(q, roomId, start, end, null);
       const code = await genCode(q);
       const [row] = await q<{ id: number }>(
-        `insert into bookings (code, customer_id, package_id, room_id, start_at, end_at, people, status, source, discount, total, notes, created_by, option_choice)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) returning id`,
+        `insert into bookings (code, customer_id, package_id, room_id, start_at, end_at, people, status, source, discount, total, notes, created_by, option_choice, discount_detail)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb) returning id`,
         [code, customerId, b.pkgId, roomId, start.toISOString(), end.toISOString(), Math.max(1, int(fd, "people")), status,
-          str(fd, "source") || "walkin", b.discount, b.total, str(fd, "notes"), user.id, b.option]);
+          str(fd, "source") || "walkin", b.discount, b.total, str(fd, "notes"), user.id, b.option, JSON.stringify(b.lines)]);
+      if (b.voucherId) await q("insert into voucher_redemptions (voucher_id, booking_id, customer_id, amount) values ($1,$2,$3,$4)", [b.voucherId, row.id, customerId, b.voucherAmount]);
       for (const i of b.items) {
         await q("insert into booking_items (booking_id, kind, ref_id, name, qty, unit_price, amount, category) values ($1,$2,$3,$4,$5,$6,$7,$8)",
           [row.id, i.kind, i.ref_id, i.name, i.qty, i.unit_price, i.qty * i.unit_price, i.category]);
@@ -150,16 +165,16 @@ export async function updateBooking(id: number, _p: ActionState, fd: FormData) {
     const start = parseWhen(fd);
     const roomId = int(fd, "room_id") || null;
     await tx(async (q) => {
-      const [cur] = await q<{ id: number }>("select id from bookings where id = $1 for update", [id]);
+      const [cur] = await q<{ id: number; discount: number; discount_detail: DiscountLine[] }>("select id, discount, discount_detail from bookings where id = $1 for update", [id]);
       if (!cur) throw new Error("Booking tidak ditemukan.");
-      const b = await buildItems(q, fd, roomId);
+      const b = await buildItems(q, fd, roomId, { existing: { id, discount: Number(cur.discount), detail: cur.discount_detail ?? [] } });
       const end = new Date(start.getTime() + b.duration * 60000);
       await checkConflict(q, roomId, start, end, id);
       await q(
         `update bookings set package_id=$1, room_id=$2, start_at=$3, end_at=$4, people=$5, source=$6,
-                discount=$7, total=$8, notes=$9, option_choice=$10 where id=$11`,
+                discount=$7, total=$8, notes=$9, option_choice=$10, discount_detail=$12::jsonb where id=$11`,
         [b.pkgId, roomId, start.toISOString(), end.toISOString(), Math.max(1, int(fd, "people")),
-          str(fd, "source") || "walkin", b.discount, b.total, str(fd, "notes"), b.option, id]);
+          str(fd, "source") || "walkin", b.discount, b.total, str(fd, "notes"), b.option, id, JSON.stringify(b.lines)]);
       await q("delete from booking_items where booking_id = $1", [id]);
       for (const i of b.items) {
         await q("insert into booking_items (booking_id, kind, ref_id, name, qty, unit_price, amount, category) values ($1,$2,$3,$4,$5,$6,$7,$8)",

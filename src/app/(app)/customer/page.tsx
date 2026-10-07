@@ -12,8 +12,8 @@ export const metadata = { title: "Customer" };
 export default async function CustomerPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   await requireUser();
   const term = ((await searchParams).q ?? "").trim();
-  const rows = await q<{ id: number; name: string; phone: string; instagram: string; visits: number; spent: number; last_visit: string | null }>(
-    `select c.id, c.name, c.phone, c.instagram,
+  const rows = await q<{ id: number; name: string; phone: string; instagram: string; is_member: boolean; visits: number; spent: number; last_visit: string | null }>(
+    `select c.id, c.name, c.phone, c.instagram, c.is_member,
             count(b.id) filter (where b.status in ('confirmed','done'))::int as visits,
             coalesce(sum(b.total) filter (where b.status = 'done'), 0) as spent,
             max(b.start_at) filter (where b.status in ('confirmed','done')) as last_visit
@@ -46,7 +46,7 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
             <Link key={c.id} href={`/customer/${c.id}`} className="card anim-rise flex items-center gap-3 p-4 transition active:scale-[.98] hover:border-accent">
               <span className="font-display grid size-11 shrink-0 place-items-center rounded-full bg-accentsoft text-lg font-semibold text-accent">{c.name.slice(0, 1).toUpperCase()}</span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold">{c.name}</span>
+                <span className="block truncate font-semibold">{c.name}{c.is_member && <span title="Member" className="ml-1.5 text-accent">★</span>}</span>
                 <span className="block truncate text-xs text-muted">{c.phone || "tanpa nomor"}{c.instagram && ` · @${c.instagram}`}</span>
                 <span className="mt-0.5 block text-xs text-muted">
                   {c.visits}x sesi · {rupiah(c.spent)}{c.last_visit && ` · terakhir ${fmtDate(dateWIB(c.last_visit), { short: true })}`}

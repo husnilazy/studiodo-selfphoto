@@ -4,11 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import { createPublicBooking } from "@/app/actions/public";
+import { quotePublic } from "@/app/actions/quote";
+import type { QuoteResult } from "@/lib/pricingServer";
+import type { Deal, GroupDeal } from "@/lib/pricing";
 import { CATEGORY_LABEL, addDays, addMin, fmtDate, rupiah } from "@/lib/format";
 import { roomGradient } from "@/lib/siteUtils";
 import { packageTotal, parseOptions, priceSuffix, roomAllowed, unitsFor } from "@/lib/packageUtils";
 
-type Pkg = { id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; image_url: string; per_person: boolean; option_label: string; options: string; room_ids: number[] };
+type Pkg = { id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; image_url: string; per_person: boolean; option_label: string; options: string; room_ids: number[]; deal?: Deal | null; group?: GroupDeal | null };
 type Room = { id: number; name: string; color: string; description: string; image_url: string };
 type Addon = { id: number; name: string; price: number };
 type Slot = { t: string; rooms: number[] };
@@ -39,11 +42,27 @@ export default function BookingWizard({
   const [hp, setHp] = useState("");
   const [busy, setBusy] = useState(false);
   const [nonce, setNonce] = useState(0);
+  const [voucher, setVoucher] = useState("");
+  const [quote, setQuote] = useState<{ key: string; q: QuoteResult } | null>(null);
   const [error, setError] = useState("");
   const top = useRef<HTMLDivElement>(null);
 
   const pkg = packages.find((p) => p.id === pkgId) ?? null;
-  const total = (pkg ? packageTotal(pkg, people) : 0) + addons.reduce((s, a) => s + (qty[a.id] ?? 0) * a.price, 0);
+  const base = (pkg ? packageTotal(pkg, people) : 0) + addons.reduce((s, a) => s + (qty[a.id] ?? 0) * a.price, 0);
+  // Harga akhir (promo, member, voucher) dihitung server; tampil setelah jeda singkat.
+  const qkey = JSON.stringify([pkgId, people, qty, phone.replace(/\D/g, ""), voucher.trim().toUpperCase()]);
+  useEffect(() => {
+    if (!pkgId) return;
+    let live = true;
+    const t = setTimeout(async () => {
+      const r = await quotePublic({ package_id: pkgId, people, addons: qty, phone, voucher });
+      if (live && r.ok) setQuote({ key: qkey, q: r.quote });
+    }, 300);
+    return () => { live = false; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qkey]);
+  const q = quote && quote.key === qkey ? quote.q : null;
+  const total = q ? q.total : base;
   const dp = Math.round((total * dpPercent) / 100);
 
   // Hari yang bisa dipilih (maks 45 hari ke depan dalam strip).
@@ -84,7 +103,7 @@ export default function BookingWizard({
     const fd = new FormData();
     fd.set("package_id", String(pkg.id)); fd.set("date", date); fd.set("time", time);
     if (roomId) fd.set("room_id", String(roomId));
-    fd.set("people", String(people)); if (option) fd.set("option_choice", option); fd.set("name", name); fd.set("phone", phone); fd.set("notes", notes); fd.set("website", hp);
+    fd.set("people", String(people)); if (option) fd.set("option_choice", option); fd.set("name", name); fd.set("phone", phone); fd.set("notes", notes); fd.set("website", hp); if (voucher.trim()) fd.set("voucher_code", voucher.trim());
     for (const [id, q] of Object.entries(qty)) if (q > 0) fd.set(`addon_${id}`, String(q));
     const r = await createPublicBooking(fd);
     if (r.ok) { router.push(r.redirect); return; }
@@ -133,7 +152,11 @@ export default function BookingWizard({
                         <p className="font-display pr-8 text-lg font-semibold leading-tight">{p.name}</p>
                         <p className="mt-1 text-sm text-muted">{p.duration_min} menit · hingga {p.max_people} orang</p>
                         {(p.description || p.includes) && <p className="mt-2 line-clamp-2 text-sm text-muted">{p.description || p.includes}</p>}
-                        <p className="font-display mt-3 text-xl font-bold text-accent">{rupiah(p.price)} <span className="text-sm font-semibold text-muted">{priceSuffix(p)}</span></p>
+                        <p className="font-display mt-3 text-xl font-bold text-accent">
+                          {p.deal && <span className="mr-2 text-sm font-semibold text-muted line-through">{rupiah(p.price)}</span>}
+                          {rupiah(p.deal ? p.deal.salePrice : p.price)} <span className="text-sm font-semibold text-muted">{priceSuffix(p)}</span>
+                        </p>
+                        {p.deal && <span className="mt-2 inline-block rounded-full bg-gradient-to-br from-rose-500 to-orange-500 px-2.5 py-0.5 text-[11px] font-extrabold text-white">🔥 {p.deal.label}{p.deal.percent > 0 ? ` -${p.deal.percent}%` : ""}</span>}
                       </button>
                     );
                   })}
@@ -155,7 +178,12 @@ export default function BookingWizard({
                   <Stepper onClick={() => setPeople((p) => Math.min(pkg.max_people, p + 1))}>+</Stepper>
                   <span className="text-sm text-muted">maks {pkg.max_people}</span>
                 </div>
-                {pkg.per_person && <p className="mt-2 text-sm font-semibold text-accent">Subtotal {rupiah(packageTotal(pkg, people))}</p>}
+                {pkg.per_person && <p className="mt-2 text-sm font-semibold text-accent">Subtotal {rupiah(q ? q.packageAmount - q.discount : packageTotal(pkg, people))}{q && q.discount > 0 && <span className="ml-2 text-xs font-semibold text-ok">hemat {rupiah(q.discount)}</span>}</p>}
+                {pkg.group && people < pkg.group.minPeople && (
+                  <button type="button" onClick={() => setPeople(Math.min(pkg.max_people, pkg.group!.minPeople))} className="pop-in mt-3 rounded-xl bg-accentsoft px-3 py-2 text-left text-xs font-semibold text-accent transition hover:brightness-105">
+                    👥 {pkg.group.text}: {rupiah(pkg.group.unitPrice)}{pkg.per_person ? " / orang" : ""} — ketuk untuk pilih {pkg.group.minPeople} orang
+                  </button>
+                )}
               </div>
               {parseOptions(pkg.options).length > 0 && (
                 <div>
@@ -243,6 +271,15 @@ export default function BookingWizard({
                 </div>
               </div>
             )}
+            <div className="glass mt-5 rounded-3xl p-5 sm:p-7">
+              <p className="font-display mb-3 flex items-center gap-2 font-semibold"><Icon name="tag" className="size-4 text-accent" /> Punya kode voucher?</p>
+              <input className="input uppercase tracking-wider" value={voucher} onChange={(e) => setVoucher(e.target.value.toUpperCase())} placeholder="Masukkan kode voucher" autoComplete="off" />
+              {voucher.trim() && q && (q.voucherError
+                ? <p className="pop-in mt-2 text-sm font-semibold text-bad">{q.voucherError}</p>
+                : q.voucher ? <p className="pop-in mt-2 text-sm font-semibold text-ok">✓ Voucher dipakai{q.voucherNote ? ` — ${q.voucherNote}` : ""}</p>
+                : q.voucherNote ? <p className="pop-in mt-2 text-sm font-semibold text-warn">{q.voucherNote}</p> : null)}
+              {q?.member?.isMember && <p className="pop-in mt-3 rounded-2xl bg-accentsoft px-4 py-3 text-sm font-semibold text-accent">⭐ Halo member {q.member.tier}! Diskon member otomatis diterapkan{q.member.nextReward ? " — kunjungan ini dapat HADIAH member 🎁" : q.member.toReward ? ` · ${q.member.toReward} kunjungan lagi dapat hadiah` : ""}.</p>}
+            </div>
           </section>
         )}
 
@@ -259,6 +296,8 @@ export default function BookingWizard({
                 <Row k="Jumlah orang" v={`${people} orang`} />
                 <Row k="Atas nama" v={`${name} · ${phone}`} />
                 {addons.filter((a) => (qty[a.id] ?? 0) > 0).map((a) => <Row key={a.id} k={`${a.name} ×${qty[a.id]}`} v={rupiah(a.price * qty[a.id])} />)}
+                {q && q.discount > 0 && <Row k="Subtotal" v={rupiah(q.subtotal)} />}
+                {q?.lines.map((l, i) => <div key={i} className="flex justify-between gap-4 text-ok"><dt>{l.label}</dt><dd className="text-right font-semibold">− {rupiah(l.amount)}</dd></div>)}
               </dl>
               <div className="mt-5 flex items-end justify-between border-t border-line pt-5">
                 <span className="font-semibold text-muted">Total</span>

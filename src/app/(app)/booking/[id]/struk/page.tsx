@@ -12,8 +12,8 @@ export default async function Receipt({ params }: { params: Promise<{ id: string
   await requireUser();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const [b] = await q<{ code: string; start_at: string; end_at: string; total: number; discount: number; customer: string; room: string | null; cashier: string | null; option_choice: string }>(
-    `select b.code, b.start_at, b.end_at, b.total, b.discount, b.option_choice, c.name as customer, r.name as room, u.name as cashier
+  const [b] = await q<{ code: string; start_at: string; end_at: string; total: number; discount: number; discount_detail: { label: string; amount: number }[]; customer: string; room: string | null; cashier: string | null; option_choice: string }>(
+    `select b.code, b.start_at, b.end_at, b.total, b.discount, b.discount_detail, b.option_choice, c.name as customer, r.name as room, u.name as cashier
        from bookings b join customers c on c.id = b.customer_id left join rooms r on r.id = b.room_id left join users u on u.id = b.created_by where b.id = $1`, [id]);
   if (!b) notFound();
   const [items, pays, studio] = await Promise.all([
@@ -50,7 +50,9 @@ export default async function Receipt({ params }: { params: Promise<{ id: string
           </div>
         ))}
         <hr className="my-3 border-dashed border-line" />
-        {b.discount > 0 && <p className="flex justify-between"><span>Diskon</span><span>-{b.discount.toLocaleString("id-ID")}</span></p>}
+        {b.discount > 0 && (b.discount_detail?.length
+          ? b.discount_detail.map((d, k) => <p key={k} className="flex justify-between"><span>{d.label}</span><span>-{d.amount.toLocaleString("id-ID")}</span></p>)
+          : <p className="flex justify-between"><span>Diskon</span><span>-{b.discount.toLocaleString("id-ID")}</span></p>)}
         <p className="flex justify-between text-base font-bold"><span>TOTAL</span><span>{rupiah(b.total)}</span></p>
         {pays.map((p, k) => (
           <p key={k} className="flex justify-between"><span>{p.kind === "refund" ? "Refund" : p.kind === "dp" ? "DP" : "Bayar"} ({METHOD_LABEL[p.method]})</span><span>{p.amount.toLocaleString("id-ID")}</span></p>

@@ -20,7 +20,7 @@ import { addPayment, deleteBooking, refundPayment, setBookingStatus, voidPayment
 export const metadata = { title: "Detail Booking" };
 
 type B = {
-  id: number; code: string; start_at: string; end_at: string; people: number; status: string; source: string; discount: number; total: number; notes: string;
+  id: number; code: string; start_at: string; end_at: string; people: number; status: string; source: string; discount: number; total: number; notes: string; discount_detail: { label: string; amount: number }[];
   option_choice: string; customer_id: number; customer_name: string; customer_phone: string; room_name: string | null; room_color: string | null; package_name: string | null; created_by_name: string | null;
 };
 type Item = { id: number; name: string; qty: number; unit_price: number; amount: number };
@@ -31,7 +31,7 @@ export default async function BookingDetail({ params }: { params: Promise<{ id: 
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
   const [b] = await q<B>(
-    `select b.id, b.code, b.start_at, b.end_at, b.people, b.status, b.source, b.discount, b.total, b.notes, b.option_choice,
+    `select b.id, b.code, b.start_at, b.end_at, b.people, b.status, b.source, b.discount, b.total, b.notes, b.discount_detail, b.option_choice,
             c.id as customer_id, c.name as customer_name, c.phone as customer_phone,
             r.name as room_name, r.color as room_color, p.name as package_name, u.name as created_by_name
        from bookings b join customers c on c.id = b.customer_id
@@ -103,7 +103,9 @@ export default async function BookingDetail({ params }: { params: Promise<{ id: 
               {items.map((i) => (
                 <tr key={i.id}><td className="!pl-0">{i.name}{i.qty > 1 && <span className="text-muted"> ×{i.qty}</span>}</td><td className="num !pr-0">{rupiah(i.amount)}</td></tr>
               ))}
-              {b.discount > 0 && <tr><td className="!pl-0 text-ok">Diskon</td><td className="num !pr-0 text-ok">− {rupiah(b.discount)}</td></tr>}
+              {b.discount > 0 && (b.discount_detail?.length
+                ? b.discount_detail.map((d, i) => <tr key={i}><td className="!pl-0 text-ok">{d.label}</td><td className="num !pr-0 text-ok">− {rupiah(d.amount)}</td></tr>)
+                : <tr><td className="!pl-0 text-ok">Diskon</td><td className="num !pr-0 text-ok">− {rupiah(b.discount)}</td></tr>)}
               <tr className="font-bold"><td className="!pl-0">Total</td><td className="num !pr-0">{rupiah(b.total)}</td></tr>
               <tr><td className="!pl-0 text-muted">Sudah dibayar</td><td className="num !pr-0">{rupiah(paid)}</td></tr>
               <tr className="font-bold"><td className="!pl-0">{due > 0 ? "Sisa tagihan" : due < 0 ? "Kelebihan bayar" : "Status"}</td>

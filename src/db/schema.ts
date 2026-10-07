@@ -1,7 +1,7 @@
 // Skema database STUDIODO Kasir (PostgreSQL / Supabase). Idempotent: aman dijalankan berulang.
 // Semua nilai uang disimpan sebagai bigint rupiah (tanpa desimal).
 // NAIKKAN versi ini setiap kali SCHEMA diubah agar database yang sudah ada ikut ter-upgrade.
-export const SCHEMA_VERSION = "2026-10-07.4";
+export const SCHEMA_VERSION = "2026-10-07.5";
 
 export const SCHEMA = `
 create table if not exists users (
@@ -249,6 +249,66 @@ alter table packages add column if not exists image_size text not null default '
 alter table packages add column if not exists image_fit text not null default 'cover';
 alter table packages add column if not exists image_x int not null default 50;
 alter table packages add column if not exists image_y int not null default 50;
+
+-- Promo, member, voucher
+create table if not exists promos (
+  id serial primary key,
+  name text not null,
+  label text not null default '',
+  kind text not null check (kind in ('percent','amount_unit','amount_total','free_units')),
+  value bigint not null default 0,
+  min_people int not null default 1,
+  package_ids int[] not null default '{}',
+  categories text[] not null default '{}',
+  starts_at timestamptz,
+  ends_at timestamptz,
+  show_countdown boolean not null default false,
+  show_on_site boolean not null default true,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+alter table promos enable row level security;
+
+create table if not exists vouchers (
+  id serial primary key,
+  code text not null unique,
+  name text not null default '',
+  batch text not null default '',
+  kind text not null check (kind in ('percent','amount')),
+  value bigint not null default 0,
+  max_discount bigint not null default 0,
+  min_spend bigint not null default 0,
+  min_people int not null default 1,
+  package_ids int[] not null default '{}',
+  categories text[] not null default '{}',
+  usage_limit int not null default 1,
+  per_customer int not null default 1,
+  starts_at timestamptz,
+  expires_at timestamptz,
+  member_only boolean not null default false,
+  customer_id int references customers(id) on delete set null,
+  stackable boolean not null default false,
+  active boolean not null default true,
+  created_by int references users(id),
+  created_at timestamptz not null default now()
+);
+alter table vouchers enable row level security;
+
+create table if not exists voucher_redemptions (
+  id serial primary key,
+  voucher_id int not null references vouchers(id) on delete cascade,
+  booking_id int not null references bookings(id) on delete cascade,
+  customer_id int references customers(id) on delete set null,
+  amount bigint not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists voucher_redemptions_voucher_idx on voucher_redemptions (voucher_id);
+alter table voucher_redemptions enable row level security;
+
+alter table bookings add column if not exists discount_detail jsonb not null default '[]';
+alter table customers add column if not exists is_member boolean not null default false;
+alter table customers add column if not exists member_no text not null default '';
+alter table customers add column if not exists member_since date;
 
 -- Monitoring sesi live
 alter table bookings add column if not exists started_at timestamptz;

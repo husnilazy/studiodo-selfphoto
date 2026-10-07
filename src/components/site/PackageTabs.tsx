@@ -2,9 +2,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import PackageCardView from "../PackageCardView";
+import type { Deal, GroupDeal } from "@/lib/pricing";
 import { CATEGORY_LABEL } from "@/lib/format";
 
-type P = { id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; image_url: string; image_size?: string; image_fit?: string; image_x?: number; image_y?: number; per_person: boolean; bookable_online: boolean };
+type P = { id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; image_url: string; image_size?: string; image_fit?: string; image_x?: number; image_y?: number; per_person: boolean; bookable_online: boolean; deal?: Deal | null; group?: GroupDeal | null };
 
 const BLURB: Record<string, string> = {
   self_photo: "Foto sendiri di studio, atur pose dan ekspresimu sepuasnya.",

@@ -5,6 +5,8 @@ import CustomerPicker from "./CustomerPicker";
 import MoneyInput from "./MoneyInput";
 import Icon from "./Icon";
 import { createBooking, updateBooking } from "@/app/actions/bookings";
+import { quoteAdmin } from "@/app/actions/quote";
+import type { QuoteResult } from "@/lib/pricingServer";
 import { CATEGORY_LABEL, METHOD_LABEL, SOURCE_LABEL, addMin, rupiah } from "@/lib/format";
 import { packageTotal, parseOptions, priceSuffix, roomAllowed, unitsFor } from "@/lib/packageUtils";
 
@@ -42,6 +44,11 @@ export default function BookingForm({
   const [payFull, setPayFull] = useState(walkin);
   const [dp, setDp] = useState(0);
   const [busy, setBusy] = useState<Busy[]>([]);
+  const [custId, setCustId] = useState<number | null>(initialCustomer?.id ?? null);
+  const [custPhone, setCustPhone] = useState("");
+  const [voucher, setVoucher] = useState("");
+  const [autoPromo, setAutoPromo] = useState(true);
+  const [quote, setQuote] = useState<QuoteResult | null>(null);
 
   const pkg = packages.find((p) => p.id === pkgId) ?? null;
   const duration = pkg?.duration_min ?? 30;
@@ -69,10 +76,23 @@ export default function BookingForm({
   };
   const myClash = time ? clash(time) : undefined;
 
-  const subtotal = (pkg ? packageTotal(pkg, people) : 0)
-    + addons.reduce((s, a) => s + (qty[a.id] ?? 0) * a.price, 0) + customPrice;
-  const disc = Math.min(discount, subtotal);
-  const total = subtotal - disc;
+  const extras = addons.reduce((s, a) => s + (qty[a.id] ?? 0) * a.price, 0) + customPrice;
+  const subtotal = (pkg ? packageTotal(pkg, people) : 0) + extras;
+
+  // Harga otomatis (promo, member, voucher) dihitung server; tampil setelah jeda singkat saat input berubah.
+  useEffect(() => {
+    if (edit) return;
+    let live = true;
+    const t = setTimeout(async () => {
+      const r = await quoteAdmin({ package_id: pkgId, people, extras, customer_id: custId, phone: custPhone, voucher, manual: discount, auto: autoPromo });
+      if (live && r.ok) setQuote(r.quote);
+    }, 350);
+    return () => { live = false; clearTimeout(t); };
+  }, [edit, pkgId, people, extras, custId, custPhone, voucher, discount, autoPromo]);
+
+  const q = !edit ? quote : null;
+  const disc = q ? q.discount : Math.min(discount, subtotal);
+  const total = q ? q.total : subtotal - disc;
   const paying = edit ? 0 : payFull ? total : Math.min(dp, total);
 
   const action = edit ? updateBooking.bind(null, booking!.id) : createBooking;
@@ -84,7 +104,7 @@ export default function BookingForm({
         <Card n={1} title="Customer">
           {edit ? (
             <p className="rounded-xl bg-panel2 px-3 py-2.5 font-semibold">{booking!.customer.name} <span className="text-sm font-normal text-muted">{booking!.customer.phone}</span></p>
-          ) : <CustomerPicker initial={initialCustomer} />}
+          ) : <CustomerPicker initial={initialCustomer} onSelect={(c) => setCustId(c?.id ?? null)} onPhone={setCustPhone} />}
         </Card>
 
         <Card n={2} title="Paket">
@@ -209,7 +229,7 @@ export default function BookingForm({
             <label className="block"><span className="label">Harga item</span>
               <MoneyInput name="custom_price" defaultValue={booking?.custom_price} onValue={setCustomPrice} />
             </label>
-            <label className="block"><span className="label">Diskon</span>
+            <label className="block"><span className="label">{edit ? "Diskon (total potongan)" : "Diskon manual tambahan"}</span>
               <MoneyInput name="discount" defaultValue={booking?.discount} onValue={setDiscount} />
             </label>
             <label className="block"><span className="label">Sumber</span>
@@ -218,6 +238,28 @@ export default function BookingForm({
               </select>
             </label>
           </div>
+          {!edit && (
+            <div className="mt-3 space-y-2 rounded-2xl border border-line bg-panel2/50 p-3.5">
+              <p className="font-display flex items-center gap-2 text-sm font-semibold"><Icon name="tag" className="size-4 text-accent" /> Promo, member &amp; voucher</p>
+              <label className="flex items-center gap-2 text-sm font-semibold">
+                <input type="checkbox" name="auto_promo" checked={autoPromo} onChange={(e) => setAutoPromo(e.target.checked)} className="size-5 accent-[var(--accent)]" /> Terapkan promo &amp; diskon member otomatis
+              </label>
+              {q?.member && (
+                <p className="anim-fade rounded-xl bg-accentsoft px-3 py-2 text-xs font-semibold text-accent">
+                  {q.member.isMember
+                    ? <>⭐ Member {q.member.tier} · {q.member.visits}x sesi{q.member.nextReward ? " · kunjungan ini mendapat HADIAH member" : q.member.toReward ? ` · ${q.member.toReward} kunjungan lagi dapat hadiah` : ""}</>
+                    : <>Customer ini belum member · {q.member.visits}x sesi. Daftarkan di menu Member.</>}
+                </p>
+              )}
+              <label className="block"><span className="label">Kode voucher</span>
+                <input name="voucher_code" className="input uppercase tracking-wider" value={voucher} onChange={(e) => setVoucher(e.target.value.toUpperCase())} placeholder="mis. SD-AB12CD" autoComplete="off" />
+              </label>
+              {voucher.trim() && q && (q.voucherError
+                ? <p className="anim-fade text-xs font-semibold text-bad">{q.voucherError}</p>
+                : q.voucher ? <p className="anim-fade text-xs font-semibold text-ok">✓ Voucher {q.voucher.code} dipakai{q.voucherNote ? ` — ${q.voucherNote}` : ""}</p>
+                : q.voucherNote ? <p className="anim-fade text-xs font-semibold text-warn">{q.voucherNote}</p> : null)}
+            </div>
+          )}
           <label className="mt-3 block"><span className="label">Catatan</span>
             <textarea name="notes" className="input" defaultValue={booking?.notes} placeholder="Permintaan khusus, tema, dll." />
           </label>
@@ -231,7 +273,8 @@ export default function BookingForm({
             <Row k={pkg ? (pkg.per_person ? `${pkg.name} × ${unitsFor(pkg, people)} orang` : pkg.name) : "Paket"} v={rupiah(pkg ? packageTotal(pkg, people) : 0)} />
             {addons.filter((a) => (qty[a.id] ?? 0) > 0).map((a) => <Row key={a.id} k={`${a.name} ×${qty[a.id]}`} v={rupiah(a.price * qty[a.id])} />)}
             {customPrice > 0 && <Row k="Item tambahan" v={rupiah(customPrice)} />}
-            {disc > 0 && <Row k="Diskon" v={`− ${rupiah(disc)}`} tone="text-ok" />}
+            {q ? q.lines.map((l, i) => <Row key={i} k={l.label} v={`− ${rupiah(l.amount)}`} tone="text-ok" />)
+              : disc > 0 && <Row k="Diskon" v={`− ${rupiah(disc)}`} tone="text-ok" />}
           </dl>
           <div className="mt-3 flex items-end justify-between border-t border-line pt-3">
             <span className="text-sm font-semibold text-muted">Total</span>

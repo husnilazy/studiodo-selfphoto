@@ -1,11 +1,14 @@
 import Icon from "./Icon";
+import Countdown from "./site/Countdown";
 import { imageSrc } from "@/lib/siteConfig";
 import { CATEGORY_LABEL, rupiah } from "@/lib/format";
+import type { Deal, GroupDeal } from "@/lib/pricing";
 import { IMAGE_SIZES, imageSizeKey, imageStyle, priceSuffix, type PackageImage } from "@/lib/packageUtils";
 
 export type CardPkg = PackageImage & {
   name: string; category: string; description: string; includes: string; price: number;
   duration_min: number; max_people: number; per_person: boolean;
+  deal?: Deal | null; group?: GroupDeal | null;
 };
 
 export const cardBullets = (p: Pick<CardPkg, "description" | "includes">) =>
@@ -28,12 +31,23 @@ export default function PackageCardView({ p, footer, className = "", style }: { 
           </div>
         )}
         <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/55 to-transparent" />
+        {p.deal && (
+          <span className="ribbon absolute right-3 top-3 rounded-full bg-gradient-to-br from-rose-500 to-orange-500 px-3 py-1 text-xs font-extrabold text-white shadow-lg shadow-rose-500/40">
+            {p.deal.percent > 0 ? `-${p.deal.percent}%` : "PROMO"}
+          </span>
+        )}
         <span className="absolute left-3 top-3 rounded-full bg-black/45 px-3 py-1 text-[11px] font-bold tracking-wide text-white backdrop-blur-md">{CATEGORY_LABEL[p.category] ?? p.category}</span>
         <div className="absolute bottom-3 left-3 flex gap-1.5 text-[11px] font-semibold text-white">
           <span className="inline-flex items-center gap-1 rounded-full bg-black/45 px-2.5 py-1 backdrop-blur-md"><Icon name="clock" className="size-3" />{p.duration_min} mnt</span>
           <span className="inline-flex items-center gap-1 rounded-full bg-black/45 px-2.5 py-1 backdrop-blur-md"><Icon name="users" className="size-3" />maks {p.max_people}</span>
         </div>
       </div>
+      {p.deal && (
+        <div className="deal-strip flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-2 text-xs font-bold text-white">
+          <span className="min-w-0 truncate">🔥 {p.deal.label}</span>
+          {p.deal.countdown && p.deal.endsAt ? <span className="flex items-center gap-1.5"><span className="font-semibold opacity-90">berakhir</span><Countdown endsAt={p.deal.endsAt} /></span> : <span className="opacity-90">{p.deal.text}</span>}
+        </div>
+      )}
       <div className="flex flex-1 flex-col p-5 sm:p-6">
         <h3 className="font-display text-xl font-semibold leading-tight">{p.name}</h3>
         {bullets.length > 0 && (
@@ -43,8 +57,17 @@ export default function PackageCardView({ p, footer, className = "", style }: { 
             ))}
           </ul>
         )}
+        {p.group && (
+          <p className="mt-4 flex items-center gap-2 rounded-xl bg-accentsoft px-3 py-2 text-xs font-semibold text-accent">
+            <Icon name="users" className="size-4 shrink-0" />
+            <span>{p.group.text}: <b>{rupiah(p.group.unitPrice)}</b>{p.per_person ? " / orang" : ""}</span>
+          </p>
+        )}
         <div className="mt-auto flex items-end justify-between gap-3 border-t border-line/70 pt-5" style={{ marginTop: "auto" }}>
-          <p className="font-display text-2xl font-bold tracking-tight text-accent">{rupiah(p.price)}<span className="ml-1 text-sm font-semibold text-muted">{priceSuffix(p)}</span></p>
+          <div>
+            {p.deal && <p className="tnum text-sm font-semibold text-muted line-through decoration-rose-500/70">{rupiah(p.price)}</p>}
+            <p className="font-display text-2xl font-bold tracking-tight text-accent">{rupiah(p.deal ? p.deal.salePrice : p.price)}<span className="ml-1 text-sm font-semibold text-muted">{priceSuffix(p)}</span></p>
+          </div>
           {footer}
         </div>
       </div>

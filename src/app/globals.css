@@ -252,3 +252,12 @@ html.theming, html.theming *, html.theming *::before, html.theming *::after { tr
 /* Kartu paket di website */
 .pkg-card:hover .pkg-img { filter: saturate(1.08); }
 @media (prefers-reduced-motion: reduce) { .page-in, .toast, .sheet-panel { animation: none; } .nav-pill { transition: none; } }
+
+/* Promo & countdown */
+@keyframes cd-tick { from { transform: translateY(-40%); opacity: 0; } to { transform: none; opacity: 1; } }
+.cd-tick { display: inline-block; animation: cd-tick .35s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes ribbon-pop { 0% { transform: scale(.6) rotate(-8deg); opacity: 0; } 70% { transform: scale(1.08) rotate(2deg); } 100% { transform: none; opacity: 1; } }
+.ribbon { animation: ribbon-pop .6s .15s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes deal-shine { to { background-position: -200% 0; } }
+.deal-strip { background: linear-gradient(100deg, #e11d48, #f97316 45%, #e11d48); background-size: 200% 100%; animation: deal-shine 6s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .cd-tick, .ribbon, .deal-strip { animation: none; } }

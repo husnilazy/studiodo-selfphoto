@@ -5,7 +5,9 @@ import Sheet from "@/components/Sheet";
 import BookingRow from "@/components/BookingRow";
 import FileForm from "@/components/FileForm";
 import FileList, { type FileItem } from "@/components/FileList";
-import { PageHeader, Stat } from "@/components/ui";
+import { ActionButton } from "@/components/ActionForm";
+import { Badge, PageHeader, Stat } from "@/components/ui";
+import { setMember } from "@/app/actions/member";
 import { requireUser } from "@/lib/auth";
 import { q } from "@/lib/db";
 import { listBookings } from "@/lib/data";
@@ -20,7 +22,7 @@ export default async function CustomerDetail({ params }: { params: Promise<{ id:
   const user = await requireUser();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const [c] = await q<{ id: number; name: string; phone: string; instagram: string; email: string; notes: string; created_at: string }>("select * from customers where id = $1", [id]);
+  const [c] = await q<{ id: number; name: string; phone: string; instagram: string; email: string; notes: string; created_at: string; is_member: boolean; member_no: string }>("select * from customers where id = $1", [id]);
   if (!c) notFound();
   const [bookings, files] = await Promise.all([
     listBookings({ customerId: id, order: "desc", limit: 100 }),
@@ -35,10 +37,11 @@ export default async function CustomerDetail({ params }: { params: Promise<{ id:
 
   return (
     <>
-      <PageHeader back="/customer" title={c.name}
+      <PageHeader back="/customer" title={c.is_member ? `${c.name} ⭐` : c.name}
         subtitle={<>{c.phone || "tanpa nomor"}{c.instagram && <> · <a className="font-semibold text-accent" href={`https://instagram.com/${c.instagram}`} target="_blank" rel="noopener noreferrer">@{c.instagram}</a></>}</>}
         actions={<>
           {c.phone && <a className="btn btn-sm" target="_blank" rel="noopener noreferrer" href={waLink(c.phone, `Halo ${c.name}, `)}><Icon name="chat" className="size-4" /> WhatsApp</a>}
+          {user.role !== "kasir" && <ActionButton action={setMember.bind(null, c.id, !c.is_member)} className="btn btn-sm" confirm={c.is_member ? `Keluarkan ${c.name} dari member?` : undefined}><Icon name="star" className="size-4" /> {c.is_member ? "Member ✓" : "Jadikan Member"}</ActionButton>}
           <Sheet title="Edit Customer" trigger={<button className="btn btn-sm"><Icon name="edit" className="size-4" /> Edit</button>}>
             <CustomerForm customer={c} canDelete={user.role !== "kasir"} />
           </Sheet>
@@ -51,6 +54,7 @@ export default async function CustomerDetail({ params }: { params: Promise<{ id:
         <Stat label="Rata-rata / sesi" value={rupiah(done.length ? Math.round(spent / done.length) : 0)} icon="chart" />
         <Stat label="Terakhir datang" value={<>{last ? fmtDate(dateWIB(last.start_at), { short: true }) : "—"}</>} icon="clock" />
       </div>
+      {c.is_member && <p className="mb-5"><Badge tone="indigo">Member {c.member_no}</Badge></p>}
       {c.notes && <p className="card mb-5 p-4 text-sm"><span className="mb-1 block text-xs font-bold uppercase tracking-wide text-muted">Catatan</span>{c.notes}</p>}
 
       <h2 className="font-display mb-3 font-semibold">Riwayat Booking</h2>

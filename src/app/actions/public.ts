@@ -5,6 +5,7 @@ import { signToken } from "@/lib/auth";
 import { checkConflict, genCode } from "@/lib/bookingUtils";
 import { expireStalePending, getOnline, publicSlots } from "@/lib/online";
 import { fromWIB } from "@/lib/format";
+import { buildQuote } from "@/lib/pricingServer";
 import { parseOptions, roomAllowed, unitsFor } from "@/lib/packageUtils";
 
 type Result = { ok: true; redirect: string } | { ok: false; error: string };
@@ -60,7 +61,10 @@ export async function createPublicBooking(fd: FormData): Promise<Result> {
         const [a] = await t<{ id: number; name: string; price: number }>("select id, name, price from addons where id = $1 and active", [Number(m[1])]);
         if (a) items.push({ kind: "addon", ref_id: a.id, name: a.name, qty, unit_price: a.price, category: "addon" });
       }
-      const total = items.reduce((s, i) => s + i.qty * i.unit_price, 0);
+      const extras = items.filter((i) => i.kind === "addon").reduce((s, i) => s + i.qty * i.unit_price, 0);
+      const qr = await buildQuote(t, { packageId: pkg.id, people: guests, extras, phone: phoneRaw, voucherCode: String(fd.get("voucher_code") ?? "").slice(0, 40), auto: true });
+      if (qr.voucherError) throw new Error(qr.voucherError);
+      const total = qr.total;
       const start = fromWIB(date, time), end = new Date(start.getTime() + pkg.duration_min * 60000);
 
       // Pilih ruang: yang diminta, atau yang pertama kosong.
@@ -76,10 +80,11 @@ export async function createPublicBooking(fd: FormData): Promise<Result> {
 
       const code = await genCode(t);
       const [b] = await t<{ id: number }>(
-        `insert into bookings (code, customer_id, package_id, room_id, start_at, end_at, people, status, source, discount, total, notes, option_choice)
-         values ($1,$2,$3,$4,$5,$6,$7,'pending','website',0,$8,$9,$10) returning id`,
+        `insert into bookings (code, customer_id, package_id, room_id, start_at, end_at, people, status, source, discount, total, notes, option_choice, discount_detail)
+         values ($1,$2,$3,$4,$5,$6,$7,'pending','website',$11,$8,$9,$10,$12::jsonb) returning id`,
         [code, customerId, pkg.id, roomId, start.toISOString(), end.toISOString(), guests, total,
-          `[Booking online]${name ? ` a.n. ${name}` : ""}${notes ? ` — ${notes}` : ""}`, option]);
+          `[Booking online]${name ? ` a.n. ${name}` : ""}${notes ? ` — ${notes}` : ""}`, option, qr.discount, JSON.stringify(qr.lines)]);
+      if (qr.voucher) await t("insert into voucher_redemptions (voucher_id, booking_id, customer_id, amount) values ($1,$2,$3,$4)", [qr.voucher.id, b.id, customerId, qr.lines.find((l) => l.type === "voucher")?.amount ?? 0]);
       for (const i of items) {
         await t("insert into booking_items (booking_id, kind, ref_id, name, qty, unit_price, amount, category) values ($1,$2,$3,$4,$5,$6,$7,$8)",
           [b.id, i.kind, i.ref_id, i.name, i.qty, i.unit_price, i.qty * i.unit_price, i.category]);
