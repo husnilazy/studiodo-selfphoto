@@ -22,20 +22,10 @@ export default function SiteNav({
 }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [hidden, setHidden] = useState(false);
   const links = ALL.filter((l) => sections.includes(l.key));
 
   useEffect(() => {
-    let lastY = window.scrollY;
-    const on = () => {
-      const y = window.scrollY;
-      setScrolled(y > 12);
-      // Sembunyi saat scroll turun jauh, muncul lagi saat scroll naik.
-      if (Math.abs(y - lastY) > 6) { setHidden(y > 280 && y > lastY); lastY = y; }
-      const h = document.documentElement.scrollHeight - innerHeight;
-      setProgress(h > 0 ? Math.min(1, window.scrollY / h) : 0);
-    };
+    const on = () => setScrolled(window.scrollY > 12);
     on();
     window.addEventListener("scroll", on, { passive: true });
     return () => window.removeEventListener("scroll", on);
@@ -47,7 +37,7 @@ export default function SiteNav({
 
   return (
     <>
-      <header className={`fixed inset-x-0 top-0 z-40 transition-all duration-500 ease-out ${scrolled || open ? "glass shadow-lg shadow-black/5" : ""} ${hidden && !open ? "-translate-y-full" : "translate-y-0"}`}>
+      <header className={`nav-base fixed inset-x-0 top-0 z-40 ${scrolled || open ? "nav-glass" : ""}`}>
         {announce.enabled && announce.text && (
           <div className="flex items-center justify-center gap-3 px-4 py-2 text-center text-xs font-semibold sm:text-sm" style={{ background: "linear-gradient(90deg, var(--accent), var(--accent-2))", color: "var(--accent-fg)" }}>
             <span>{announce.text}</span>
@@ -66,7 +56,6 @@ export default function SiteNav({
             </button>
           </div>
         </div>
-        <div className="h-0.5 origin-left bg-accent transition-transform duration-150" style={{ transform: `scaleX(${progress})` }} />
       </header>
 
       <div className={`fixed inset-0 z-30 transition-all duration-500 md:hidden ${open ? "visible opacity-100" : "invisible opacity-0"}`} aria-hidden={!open}>

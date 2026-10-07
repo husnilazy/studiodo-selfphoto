@@ -208,3 +208,7 @@ details[open] .faq-plus { transform: rotate(45deg); }
 .split.now .split-word > span { transform: none; animation: wordup 1s cubic-bezier(.2,.8,.2,1) both; }
 .reveal-now { animation: revealin .9s cubic-bezier(.2,.8,.2,1) both; }
 @media (prefers-reduced-motion: reduce) { .split.now .split-word > span, .reveal-now { animation: none; } }
+
+/* Header situs: kaca tipis tanpa garis tepi penuh (hanya garis halus di bawah), tetap menempel saat scroll */
+.nav-base { background-color: transparent; border-bottom: 1px solid transparent; transition: background-color .35s ease, border-color .35s ease, box-shadow .35s ease, backdrop-filter .35s ease; }
+.nav-glass { @apply backdrop-blur-[12px] backdrop-saturate-[1.25]; background-color: color-mix(in oklab, var(--bg) 62%, transparent); border-bottom-color: color-mix(in oklab, var(--line) 55%, transparent); box-shadow: 0 10px 30px -22px rgba(0,0,0,.45); }
