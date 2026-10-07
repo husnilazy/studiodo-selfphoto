@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Icon from "../Icon";
+import Reveal from "./Reveal";
 import { imageSrc } from "@/lib/siteConfig";
 
 export default function GalleryGrid({ items }: { items: { url: string; caption: string }[] }) {
@@ -18,11 +19,13 @@ export default function GalleryGrid({ items }: { items: { url: string; caption: 
     <>
       <div className="columns-2 gap-3 sm:columns-3 sm:gap-4">
         {items.map((it, i) => (
-          <button key={i} type="button" onClick={() => setOpen(i)} className="lift group relative mb-3 block w-full overflow-hidden rounded-2xl sm:mb-4" aria-label={it.caption || `Foto ${i + 1}`}>
+          <Reveal key={i} variant={["zoom", "up", "blur"][i % 3] as "zoom" | "up" | "blur"} delay={(i % 3) * 90} className="mb-3 break-inside-avoid sm:mb-4">
+          <button type="button" onClick={() => setOpen(i)} className="lift group relative block w-full overflow-hidden rounded-2xl" aria-label={it.caption || `Foto ${i + 1}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={imageSrc(it.url)} alt={it.caption} loading="lazy" className="w-full object-cover transition-transform duration-700 group-hover:scale-105" />
             {it.caption && <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 text-left text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">{it.caption}</span>}
           </button>
+          </Reveal>
         ))}
       </div>
       {open !== null && (

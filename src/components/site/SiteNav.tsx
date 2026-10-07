@@ -23,11 +23,16 @@ export default function SiteNav({
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [hidden, setHidden] = useState(false);
   const links = ALL.filter((l) => sections.includes(l.key));
 
   useEffect(() => {
+    let lastY = window.scrollY;
     const on = () => {
-      setScrolled(window.scrollY > 12);
+      const y = window.scrollY;
+      setScrolled(y > 12);
+      // Sembunyi saat scroll turun jauh, muncul lagi saat scroll naik.
+      if (Math.abs(y - lastY) > 6) { setHidden(y > 280 && y > lastY); lastY = y; }
       const h = document.documentElement.scrollHeight - innerHeight;
       setProgress(h > 0 ? Math.min(1, window.scrollY / h) : 0);
     };
@@ -42,14 +47,14 @@ export default function SiteNav({
 
   return (
     <>
-      <header className={`fixed inset-x-0 top-0 z-40 transition-all duration-300 ${scrolled || open ? "glass shadow-sm" : ""}`}>
+      <header className={`fixed inset-x-0 top-0 z-40 transition-all duration-500 ease-out ${scrolled || open ? "glass shadow-lg shadow-black/5" : ""} ${hidden && !open ? "-translate-y-full" : "translate-y-0"}`}>
         {announce.enabled && announce.text && (
           <div className="flex items-center justify-center gap-3 px-4 py-2 text-center text-xs font-semibold sm:text-sm" style={{ background: "linear-gradient(90deg, var(--accent), var(--accent-2))", color: "var(--accent-fg)" }}>
             <span>{announce.text}</span>
             {announce.link && <Link href={announce.link} className="shrink-0 rounded-full bg-white/25 px-3 py-0.5 font-bold backdrop-blur transition hover:bg-white/40">{announce.link_label || "Lihat"}</Link>}
           </div>
         )}
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+        <div className={`mx-auto flex max-w-6xl transition-[height] duration-500 ${scrolled ? "h-14" : "h-16"} items-center justify-between px-4 sm:px-6`}>
           <Link href="/" onClick={() => setOpen(false)}><BrandMark name={name} logo={logo} logoDark={logoDark} height={logoHeight} text={text} textSize={textSize} textFont={textFont} /></Link>
           <nav className="hidden items-center gap-7 md:flex">
             {links.map((l) => <a key={l.href} href={l.href} className="text-sm font-semibold text-muted transition-colors hover:text-fg">{l.label}</a>)}

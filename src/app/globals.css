@@ -122,7 +122,7 @@ html { scroll-behavior: smooth; }
     radial-gradient(50rem 36rem at -10% 25%, color-mix(in oklab, var(--accent-2) 22%, transparent), transparent 60%),
     var(--bg);
 }
-.glass { background: color-mix(in oklab, var(--panel) 82%, transparent); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); border: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
+.glass { @apply backdrop-blur-[18px] backdrop-saturate-150; background: color-mix(in oklab, var(--panel) 82%, transparent); border: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
 .grad-text { background: linear-gradient(100deg, var(--accent), var(--accent-2) 55%, var(--accent)); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent; animation: sheen 7s linear infinite; }
 .btn-hero { min-height: 3.25rem; padding: 0 1.6rem; border-radius: 999px; font-size: 1rem; }
 .btn-glow { box-shadow: 0 10px 34px -10px var(--accent); }
@@ -168,3 +168,43 @@ details[open] .faq-plus { transform: rotate(45deg); }
   :root:not([data-theme="light"]) .has-dark-logo .logo-l { display: none; }
   :root:not([data-theme="light"]) .has-dark-logo .logo-d { display: block; }
 }
+
+/* ───────── Gerak lanjutan: varian reveal, split title, spotlight, akordeon, kedalaman ───────── */
+.reveal[data-v="left"] { transform: translateX(-48px); }
+.reveal[data-v="right"] { transform: translateX(48px); }
+.reveal[data-v="zoom"] { transform: scale(.9); }
+.reveal[data-v="blur"] { filter: blur(14px); transform: translateY(18px); }
+.reveal[data-v].in { opacity: 1; transform: none; filter: none; }
+
+.split-word { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: .12em; margin-bottom: -.12em; }
+.split-word > span { display: inline-block; transform: translateY(115%); transition: transform 1s cubic-bezier(.2,.8,.2,1); }
+.split.in .split-word > span { transform: none; }
+@media (scripting: none) { .split-word > span { transform: none; } }
+
+.spot { position: relative; }
+.spot::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .35s ease;
+  background: radial-gradient(380px circle at var(--sx, 50%) var(--sy, 50%), color-mix(in oklab, var(--accent) 20%, transparent), transparent 62%);
+}
+.spot:hover::after { opacity: 1; }
+
+.acc { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .5s cubic-bezier(.2,.8,.2,1); }
+.acc[data-open="true"] { grid-template-rows: 1fr; }
+.acc > div { overflow: hidden; }
+
+.depth { transition: transform .35s cubic-bezier(.2,.8,.2,1); transform: translate3d(calc(var(--mx, 0) * var(--dx, 0px)), calc(var(--my, 0) * var(--dy, 0px)), 0); }
+.tilt { transition: transform .35s cubic-bezier(.2,.8,.2,1); transform-style: preserve-3d; }
+
+@keyframes gradmove { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+.cta-bg { background-size: 200% 200%; animation: gradmove 12s ease-in-out infinite; }
+@keyframes line-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.eyebrow-line { display: inline-block; height: 2px; width: 2.5rem; vertical-align: middle; margin: 0 .75rem; background: currentColor; transform-origin: left; transform: scaleX(0); transition: transform .9s .2s cubic-bezier(.2,.8,.2,1); }
+.in .eyebrow-line { transform: scaleX(1); }
+@media (prefers-reduced-motion: reduce) { .depth, .tilt, .cta-bg { transition: none; animation: none; transform: none; } }
+
+/* Animasi masuk untuk area paling atas: murni CSS, jalan sejak paint pertama (tanpa menunggu JavaScript) */
+@keyframes wordup { from { transform: translateY(115%); } to { transform: none; } }
+@keyframes revealin { from { opacity: 0; transform: translateY(24px) scale(.985); filter: blur(10px); } to { opacity: 1; transform: none; filter: none; } }
+.split.now .split-word > span { transform: none; animation: wordup 1s cubic-bezier(.2,.8,.2,1) both; }
+.reveal-now { animation: revealin .9s cubic-bezier(.2,.8,.2,1) both; }
+@media (prefers-reduced-motion: reduce) { .split.now .split-word > span, .reveal-now { animation: none; } }

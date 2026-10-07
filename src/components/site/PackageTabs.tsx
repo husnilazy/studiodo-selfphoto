@@ -37,7 +37,7 @@ export default function PackageTabs({ packages, bookingOpen }: { packages: P[]; 
 
       <div key={cat} className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {list.map((p, i) => (
-          <article key={p.id} className="step-in glass lift group flex flex-col overflow-hidden rounded-3xl" style={{ animationDelay: `${i * 70}ms` }}>
+          <article key={p.id} className="step-in glass lift spot group flex flex-col overflow-hidden rounded-3xl" style={{ animationDelay: `${i * 70}ms` }}>
             {p.image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={p.image_url} alt={p.name} loading="lazy" className="h-44 w-full object-cover transition-transform duration-700 group-hover:scale-105" />
