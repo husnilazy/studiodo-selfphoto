@@ -103,3 +103,23 @@ export function moveLayer(p: Page, id: string, dir: 1 | -1 | "top" | "bottom"): 
 }
 
 export const clonePage = (p: Page): Page => ({ ...JSON.parse(JSON.stringify(p)), id: uid(), layers: p.layers.map((l) => ({ ...JSON.parse(JSON.stringify(l)), id: uid() })) });
+
+export function layerName(l: Layer): string {
+  if (l.name) return l.name;
+  if (l.type === "text") return l.text.replace(/\s+/g, " ").slice(0, 28) || "Teks";
+  if (l.type === "photo") return l.src ? "Foto" : "Kotak foto kosong";
+  if (l.type === "frame") return "Frame";
+  return l.shape === "circle" ? "Lingkaran" : "Kotak";
+}
+
+/** Rata ke halaman. */
+export function alignLayer(l: Layer, page: { w: number; h: number }, h: number, to: "l" | "c" | "r" | "t" | "m" | "b"): Partial<Layer> {
+  if (to === "l") return { x: 0 };
+  if (to === "c") return { x: (page.w - l.w) / 2 };
+  if (to === "r") return { x: page.w - l.w };
+  if (to === "t") return { y: 0 };
+  if (to === "m") return { y: (page.h - h) / 2 };
+  return { y: page.h - h };
+}
+
+export const addLayer = (p: Page, l: Layer): Page => ({ ...p, layers: [...p.layers, l] });

@@ -25,7 +25,7 @@ export default function Stage({
   const canvas = useRef<HTMLCanvasElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState(0.4);
-  const [guides, setGuides] = useState<{ v: boolean; h: boolean }>({ v: false, h: false });
+  const [guides, setGuides] = useState<{ v: number[]; h: number[] }>({ v: [], h: [] });
   const gesture = useRef<Gesture | null>(null);
   const scale = fit * zoom;
   const sel = page.layers.find((l) => l.id === selId) ?? null;
@@ -47,7 +47,7 @@ export default function Stage({
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = Math.round(page.w * scale * dpr), h = Math.round(page.h * scale * dpr);
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
-    const id = requestAnimationFrame(() => renderPage(c.getContext("2d")!, page, scale * dpr, imgs));
+    const id = requestAnimationFrame(() => renderPage(c.getContext("2d")!, page, scale * dpr, imgs, true));
     return () => cancelAnimationFrame(id);
   }, [page, scale, version, imgs]);
 
@@ -88,11 +88,20 @@ export default function Stage({
     const p = toPage(e);
     if (g.t === "move") {
       let x = g.l.x + (p.x - g.sx), y = g.l.y + (p.y - g.sy);
-      const h = layerHeight(g.l), thr = 8 / scale;
-      const gv = Math.abs(x + g.l.w / 2 - page.w / 2) < thr, gh = Math.abs(y + h / 2 - page.h / 2) < thr;
-      if (gv) x = page.w / 2 - g.l.w / 2;
-      if (gh) y = page.h / 2 - h / 2;
-      setGuides({ v: gv, h: gh });
+      const h = layerHeight(g.l), thr = 7 / scale;
+      // garis bantu pintar: tepi/tengah halaman dan elemen lain
+      const others = page.layers.filter((o) => o.id !== g.l.id && !o.hidden && o.type !== "frame" && !(o.w >= page.w && layerHeight(o) >= page.h));
+      const vl = [0, page.w / 2, page.w, ...others.flatMap((o) => [o.x, o.x + o.w / 2, o.x + o.w])];
+      const hl = [0, page.h / 2, page.h, ...others.flatMap((o) => { const oh = layerHeight(o); return [o.y, o.y + oh / 2, o.y + oh]; })];
+      const snap = (edges: number[], lines: number[]) => {
+        let best: { d: number; line: number } | null = null;
+        for (const e of edges) for (const ln of lines) { const d = ln - e; if (Math.abs(d) < thr && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, line: ln }; }
+        return best;
+      };
+      const sx = snap([x, x + g.l.w / 2, x + g.l.w], vl), sy = snap([y, y + h / 2, y + h], hl);
+      if (sx) x += sx.d;
+      if (sy) y += sy.d;
+      setGuides({ v: sx ? [sx.line] : [], h: sy ? [sy.line] : [] });
       update(g.l.id, { x, y }, `move-${g.l.id}`);
     } else if (g.t === "pan") {
       const l = g.l, dx = p.x - g.sx, dy = p.y - g.sy;
@@ -118,7 +127,7 @@ export default function Stage({
       update(l.id, { rot: Math.round(deg * 10) / 10 }, `rot-${l.id}`);
     }
   };
-  const up = () => { gesture.current = null; setGuides({ v: false, h: false }); };
+  const up = () => { gesture.current = null; setGuides({ v: [], h: [] }); };
 
   const startHandle = (t: "resize" | "rotate") => (e: React.PointerEvent) => {
     if (!sel) return;
@@ -167,8 +176,8 @@ export default function Stage({
           );
         })}
 
-        {guides.v && <i className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-fuchsia-500" />}
-        {guides.h && <i className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-fuchsia-500" />}
+        {guides.v.map((x) => <i key={`v${x}`} className="pointer-events-none absolute inset-y-0 w-px bg-fuchsia-500" style={{ left: x * scale }} />)}
+        {guides.h.map((y) => <i key={`h${y}`} className="pointer-events-none absolute inset-x-0 h-px bg-fuchsia-500" style={{ top: y * scale }} />)}
 
         {/* kotak seleksi */}
         {sel && !sel.locked && (

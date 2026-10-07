@@ -4,24 +4,27 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Icon from "../Icon";
 import { toast } from "../Toaster";
 import ExportDialog from "./ExportDialog";
-import LeftPanel, { type FrameRow, type LibRow, type PoolItem, type Tab } from "./LeftPanel";
+import LayersPanel from "./LayersPanel";
+import LeftPanel, { type AssetRow, type FrameRow, type LibRow, type PoolItem, type Tab } from "./LeftPanel";
 import PropsPanel from "./PropsPanel";
 import Stage from "./Stage";
-import { saveDesign } from "@/app/actions/studio";
+import { deleteAsset, saveAsset, saveDesign } from "@/app/actions/studio";
 import { buildCarousel, BG_PRESETS, type CarouselStyle, type LayoutId, type Pic } from "@/lib/editor/layouts";
-import { addPhoto, applyFrame, assignToSlot, clonePage, emptySlots, fillEmptySlots, frameOf, isSlotPhoto, moveLayer, reflow, removeFrame } from "@/lib/editor/ops";
-import { canvasToBlob, loadImg, renderToCanvas, renderPage, setFontMap } from "@/lib/editor/render";
-import { newPage, newShape, newText, uid, type Design, type Filter, type Layer, type Page, type PhotoLayer } from "@/lib/editor/types";
+import { addLayer, addPhoto, alignLayer, applyFrame, assignToSlot, clonePage, emptySlots, fillEmptySlots, frameOf, isSlotPhoto, moveLayer, reflow, removeFrame } from "@/lib/editor/ops";
+import { assetById } from "@/lib/editor/assets";
+import { assetLayer, logoLayer, placeholder, safeSrc, type Brand, type Template } from "@/lib/editor/templates";
+import { canvasToBlob, layerHeight, loadImg, renderToCanvas, renderPage, setFontMap } from "@/lib/editor/render";
+import { GOOGLE_FONTS, newPage, newPhoto, newShape, newText, uid, type Design, type Filter, type Layer, type Page, type PhotoLayer } from "@/lib/editor/types";
 import { shrinkImage, uploadToStorage } from "@/lib/uploadClient";
 
 type Props = {
   initial: Design; designId: number | null; frames: FrameRow[]; storage: boolean; canManageFrames: boolean;
-  customer: { id: number; name: string } | null; startFrame: number | null;
+  customer: { id: number; name: string } | null; startFrame: number | null; brand: Brand; assets: AssetRow[];
 };
 
 const dims = async (src: string) => { const im = await loadImg(src); return { nw: im.naturalWidth, nh: im.naturalHeight }; };
 
-export default function EditorApp({ initial, designId: initialId, frames, storage, canManageFrames, customer, startFrame }: Props) {
+export default function EditorApp({ initial, designId: initialId, frames, storage, canManageFrames, customer, startFrame, brand, assets: initialAssets }: Props) {
   const [doc, setDocState] = useState<Design>(initial);
   const docRef = useRef(initial);
   const [past, setPast] = useState<Design[]>([]);
@@ -38,6 +41,11 @@ export default function EditorApp({ initial, designId: initialId, frames, storag
   const [dirty, setDirty] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [drag, setDrag] = useState(false);
+  const [assets, setAssets] = useState<AssetRow[]>(initialAssets);
+  const [assetBusy, setAssetBusy] = useState(false);
+  const [right, setRight] = useState<"props" | "layers">("props");
+  const [logoDims, setLogoDims] = useState<Partial<Brand>>({});
+  const clip = useRef<Layer | null>(null);
   const [ver, setVer] = useState(0);
   const imgs = useRef(new Map<string, HTMLImageElement>());
   const last = useRef({ key: "", t: 0 });
@@ -200,6 +208,85 @@ export default function EditorApp({ initial, designId: initialId, frames, storag
     addPoolPics([{ src, ...d, name: f.name }], false);
   };
 
+  /* ───────── font, brand, aset, template ───────── */
+  const brandFull: Brand = { ...brand, ...logoDims };
+  const palette = useMemo(() => [brand.accent, brand.accent2], [brand.accent, brand.accent2]);
+  useEffect(() => {
+    const dim = async (u: string) => { try { const im = await loadImg(safeSrc(u)); return [im.naturalWidth, im.naturalHeight] as const; } catch { return null; } };
+    void (async () => {
+      const [a, b] = await Promise.all([brand.logo ? dim(brand.logo) : null, brand.logoDark ? dim(brand.logoDark) : null]);
+      setLogoDims({ ...(a ? { logoW: a[0], logoH: a[1] } : {}), ...(b ? { logoDarkW: b[0], logoDarkH: b[1] } : {}) });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const ensureFont = useCallback((name: string) => {
+    void Promise.all([`400 28px "${name}"`, `800 28px "${name}"`, `italic 500 28px "${name}"`].map((f) => document.fonts.load(f).catch(() => null))).then(() => setVer((v) => v + 1));
+  }, []);
+  useEffect(() => {
+    const names = new Set(initial.pages.flatMap((p) => p.layers).flatMap((l) => (l.type === "text" ? [l.font] : [])));
+    names.forEach(ensureFont);
+  }, [initial, ensureFont]);
+
+  const centerBox = (w: number, nw: number, nh: number) => { const h = w * (nh / nw); return { x: (page.w - w) / 2, y: (page.h - h) / 2, w, h }; };
+  const addNew = (l: Layer) => { mutatePage((p) => addLayer(p, l)); setSelId(l.id); };
+
+  const addAsset = (id: string) => {
+    const a = assetById(id)!;
+    if (a.cat === "bingkai") { addNew(assetLayer(id, "#ffffff", { x: 0, y: 0, w: page.w, h: page.h })); return; }
+    const w = id === "line" ? page.w * 0.6 : id === "wave" || id === "underline" || id === "ribbon" || id === "tape" ? page.w * 0.45 : page.w * 0.26;
+    addNew(assetLayer(id, a.color, centerBox(w, a.w, a.h)));
+  };
+  const addEmoji = (e: string) => {
+    const w = page.w * 0.22;
+    addNew(newText(e, (page.w - w) / 2, page.h * 0.4, w, { size: Math.round(page.w * 0.16), weight: 400, font: "Arial", color: "#000000" }));
+  };
+  const addBrandText = (t: string) => {
+    const w = page.w * 0.7;
+    addNew(newText(t, (page.w - w) / 2, page.h * 0.45, w, { size: Math.round(page.w * 0.05), weight: 700, color: page.bg.c1 === "#0b1020" ? "#ffffff" : "#0b1020", font: "Plus Jakarta Sans" }));
+  };
+  const addBrandLogo = (dark: boolean) => {
+    const l = logoLayer(brandFull, dark, page.w / 2, page.h * 0.08, page.w * 0.4, page.h * 0.12);
+    addNew(l);
+  };
+  const addMyAsset = async (a: AssetRow) => {
+    let { w: nw, h: nh } = a;
+    if (!nw || !nh) { try { ({ nw, nh } = await dims(a.url)); } catch { nw = 400; nh = 400; } }
+    const box = centerBox(page.w * 0.35, nw, nh);
+    addNew(newPhoto(a.url, nw, nh, box, { fit: "contain", name: a.name }));
+  };
+  const uploadAssets = async (files: FileList | File[]) => {
+    if (!storage) { toast("Upload belum aktif di server — aset tidak bisa disimpan", "bad"); return; }
+    setAssetBusy(true);
+    for (const f of [...files]) {
+      try {
+        const file = f.type === "image/svg+xml" ? f : await shrinkImage(f, 2400, 0.92);
+        const up = await uploadToStorage(file, undefined, true);
+        if (!up.url) throw new Error(up.error ?? "Upload gagal");
+        const d = await dims(up.url);
+        const r = await saveAsset({ name: f.name.replace(/\.\w+$/, ""), url: up.url, w: d.nw, h: d.nh });
+        if (!r.ok) throw new Error(r.error);
+        setAssets((a) => [{ id: r.id, name: f.name.replace(/\.\w+$/, ""), url: up.url!, w: d.nw, h: d.nh }, ...a]);
+      } catch (e) { toast(e instanceof Error ? e.message : `Gagal mengunggah ${f.name}`, "bad"); }
+    }
+    setAssetBusy(false);
+  };
+  const deleteMyAsset = async (id: number) => { const r = await deleteAsset(id); if (r.ok) setAssets((a) => a.filter((x) => x.id !== id)); else toast(r.error, "bad"); };
+
+  const applyTemplate = (t: Template) => {
+    const np = t.make(page.w, page.h, brandFull);
+    mutatePage((p) => ({ ...np, id: p.id }));
+    np.layers.forEach((l) => l.type === "text" && ensureFont(l.font));
+    setSelId(null); setTab("foto"); toast(`Template “${t.label}” diterapkan`);
+  };
+
+  const fillWith = (layerId: string, it: { src: string; nw: number; nh: number; name?: string; id?: string }) => {
+    patchLayer(layerId, { src: it.src, nw: it.nw, nh: it.nh, name: it.name, zoom: 1, ox: 0, oy: 0, fit: "cover" } as Partial<Layer>, `fill-${layerId}`);
+  };
+  const fillPlaceholder = () => { const it = pool.find((x) => x.sel); if (it && sel) { fillWith(sel.id, it); setPool((p) => p.map((x) => (x.id === it.id ? { ...x, sel: false } : x))); } };
+  const alignSel = (to: "l" | "c" | "r" | "t" | "m" | "b") => { if (sel) patchLayer(sel.id, alignLayer(sel, page, layerHeight(sel), to), "align"); };
+  const toggleFlag = (id: string, k: "hidden" | "locked") => mutatePage((p) => ({ ...p, layers: p.layers.map((l) => (l.id === id ? { ...l, [k]: !l[k] } : l)) }));
+
   /* ───────── halaman ───────── */
   const addPage = () => { mutate((d) => ({ ...d, pages: [...d.pages, newPage(page.w, page.h, page.bg)] })); setPi(doc.pages.length); setSelId(null); };
   const dupPage = () => { mutate((d) => ({ ...d, pages: [...d.pages.slice(0, pi + 1), clonePage(d.pages[pi]), ...d.pages.slice(pi + 1)] })); setPi(pi + 1); setSelId(null); };
@@ -249,7 +336,7 @@ export default function EditorApp({ initial, designId: initialId, frames, storag
       doc.pages.forEach((p) => {
         const c = thumbs.current[p.id]; if (!c) return;
         const k = 72 / p.h; c.width = Math.max(1, Math.round(p.w * k)); c.height = 72;
-        renderPage(c.getContext("2d")!, p, k, imgs.current);
+        renderPage(c.getContext("2d")!, p, k, imgs.current, true);
       });
     }, 160);
     return () => clearTimeout(t);
@@ -265,6 +352,12 @@ export default function EditorApp({ initial, designId: initialId, frames, storag
       else if (mod && e.key.toLowerCase() === "y") { e.preventDefault(); redo(); }
       else if (mod && e.key.toLowerCase() === "d") { e.preventDefault(); duplicateSel(); }
       else if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); void save(); }
+      else if (mod && e.key.toLowerCase() === "c" && sel && sel.type !== "frame") { clip.current = JSON.parse(JSON.stringify(sel)); toast("Disalin"); }
+      else if (mod && e.key.toLowerCase() === "v" && clip.current) {
+        e.preventDefault();
+        const c = { ...JSON.parse(JSON.stringify(clip.current)), id: uid(), slot: undefined, x: clip.current.x + 30, y: clip.current.y + 30 } as Layer;
+        mutatePage((p) => addLayer(p, c)); setSelId(c.id);
+      }
       else if ((e.key === "Delete" || e.key === "Backspace") && sel && !sel.locked) { e.preventDefault(); removeSel(); }
       else if (sel && !sel.locked && e.key.startsWith("Arrow")) {
         e.preventDefault();
@@ -315,14 +408,17 @@ export default function EditorApp({ initial, designId: initialId, frames, storag
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[19rem_minmax(0,1fr)_19rem]">
         <aside className="no-print flex max-h-[42dvh] min-h-0 flex-col border-b border-line bg-panel lg:max-h-none lg:border-b-0 lg:border-r">
           <LeftPanel tab={tab} setTab={setTab} pool={pool}
-            toggle={(id) => setPool((p) => p.map((x) => (x.id === id ? { ...x, sel: !x.sel } : x)))}
+            toggle={(id) => { const it = pool.find((x) => x.id === id); if (it && sel?.type === "photo" && !sel.src) fillWith(sel.id, it); else setPool((p) => p.map((x) => (x.id === id ? { ...x, sel: !x.sel } : x))); }}
             removePool={(id) => setPool((p) => p.filter((x) => x.id !== id))}
             selectAll={(on) => setPool((p) => p.map((x) => ({ ...x, sel: on })))}
             onFiles={onFiles} uploading={uploading}
             frames={frames} canManageFrames={canManageFrames} hasFrame={!!frameOf(page)} applyFrame={doApplyFrame}
             removeFrame={() => mutatePage(removeFrame)} emptySlots={empty} fillSlots={fillSlots}
             addSelected={addSelected} layout={doLayout} carousel={doCarousel} addText={addText} addShape={addShape}
-            customerHint={customer?.name ?? ""} addLibrary={addLibrary} />
+            customerHint={customer?.name ?? ""} addLibrary={addLibrary}
+            brand={brandFull} assets={assets} pageW={page.w} pageH={page.h} assetBusy={assetBusy}
+            applyTemplate={applyTemplate} addAsset={addAsset} addEmoji={addEmoji} addBrandLogo={addBrandLogo} addBrandText={addBrandText}
+            addMyAsset={addMyAsset} uploadAssets={uploadAssets} deleteMyAsset={deleteMyAsset} />
         </aside>
 
         <main className="flex min-h-0 min-w-0 flex-col">
@@ -343,11 +439,23 @@ export default function EditorApp({ initial, designId: initialId, frames, storag
           </div>
         </main>
 
-        <aside className="no-print max-h-[42dvh] min-h-0 overflow-y-auto border-t border-line bg-panel lg:max-h-none lg:border-l lg:border-t-0">
-          <PropsPanel page={page} layer={sel} cropMode={cropMode} setCropMode={setCropMode}
-            patch={(p, key) => sel && patchLayer(sel.id, p, key)} patchPage={mutatePage}
-            remove={removeSel} duplicate={duplicateSel} order={(d) => sel && mutatePage((p) => moveLayer(p, sel.id, d))}
-            replacePhoto={replacePhoto} applyFilterAll={applyFilterAll} detachSlot={detachSlot} deletePage={delPage} />
+        <aside className="no-print flex max-h-[42dvh] min-h-0 flex-col border-t border-line bg-panel lg:max-h-none lg:border-l lg:border-t-0">
+          <div className="grid grid-cols-2 gap-1 border-b border-line p-1.5 text-xs font-bold">
+            {([["props", "Properti"], ["layers", `Layer (${page.layers.length})`]] as const).map(([k, l]) => (
+              <button key={k} onClick={() => setRight(k)} className={`rounded-lg py-1.5 transition ${right === k ? "bg-accent text-accentfg shadow" : "text-muted hover:text-fg"}`}>{l}</button>
+            ))}
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {right === "props" ? (
+              <PropsPanel page={page} layer={sel} cropMode={cropMode} setCropMode={setCropMode}
+                patch={(p, key) => sel && patchLayer(sel.id, p, key)} patchPage={mutatePage}
+                remove={removeSel} duplicate={duplicateSel} order={(d) => sel && mutatePage((p) => moveLayer(p, sel.id, d))}
+                replacePhoto={replacePhoto} applyFilterAll={applyFilterAll} detachSlot={detachSlot} deletePage={delPage}
+                palette={palette} align={alignSel} ensureFont={ensureFont} fillPlaceholder={fillPlaceholder} canFill={pool.some((x) => x.sel)} />
+            ) : (
+              <LayersPanel page={page} selId={selId} onSelect={(id) => { setSelId(id); }} onToggle={toggleFlag} onMove={(id, d) => mutatePage((p) => moveLayer(p, id, d))} />
+            )}
+          </div>
         </aside>
       </div>
 

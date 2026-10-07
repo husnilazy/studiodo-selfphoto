@@ -112,7 +112,8 @@ export function photoRect(l: PhotoLayer) {
   return { dx: (l.w - dw) / 2 - l.ox * fx, dy: (l.h - dh) / 2 - l.oy * fy, dw, dh };
 }
 
-function drawPhoto(c: CanvasRenderingContext2D, l: PhotoLayer, img: HTMLImageElement | undefined, scale: number) {
+function drawPhoto(c: CanvasRenderingContext2D, l: PhotoLayer, img: HTMLImageElement | undefined, scale: number, placeholders: boolean) {
+  if (!img && !placeholders) return; // saat ekspor, kotak foto kosong tidak ikut tercetak
   const bleed = l.slot !== undefined ? 1.5 : 0;
   if (l.shadow) {
     c.save();
@@ -133,6 +134,8 @@ function drawPhoto(c: CanvasRenderingContext2D, l: PhotoLayer, img: HTMLImageEle
     c.drawImage(smoothSource(img, r.dw * scale, r.dh * scale), r.dx, r.dy, r.dw, r.dh);
   } else {
     c.fillStyle = "#d8dbe8"; c.fillRect(0, 0, l.w, l.h);
+    c.fillStyle = "#8d94b0"; c.font = `600 ${Math.max(14, Math.min(l.w, l.h) * 0.14)}px sans-serif`; c.textAlign = "center"; c.textBaseline = "middle";
+    c.fillText("+ foto", l.w / 2, l.h / 2);
   }
   c.restore();
   if (l.border > 0) {
@@ -153,13 +156,19 @@ function drawText(c: CanvasRenderingContext2D, t: TextLayer) {
   if (t.shadow) { c.shadowColor = "rgba(0,0,0,.55)"; c.shadowBlur = t.size * 0.18; c.shadowOffsetY = t.size * 0.05; }
   c.fillStyle = t.color; c.textAlign = t.align;
   const ax = t.align === "center" ? t.w / 2 : t.align === "right" ? t.w : 0;
-  lines.forEach((s, i) => c.fillText(s, ax, i * t.size * t.lineHeight + (t.size * t.lineHeight - t.size) / 2));
+  const sw = t.strokeW ?? 0;
+  if (sw > 0 && t.stroke) { c.lineJoin = "round"; c.miterLimit = 2; c.strokeStyle = t.stroke; c.lineWidth = sw * 2; }
+  lines.forEach((s, i) => {
+    const y = i * t.size * t.lineHeight + (t.size * t.lineHeight - t.size) / 2;
+    if (sw > 0 && t.stroke) c.strokeText(s, ax, y);
+    c.fillText(s, ax, y);
+  });
 }
 
 export function layerHeight(l: Layer): number { return l.type === "text" ? textBox(l).h : l.h; }
 
 /** Menggambar seluruh halaman pada `scale` (1 = ukuran piksel halaman). */
-export function renderPage(c: CanvasRenderingContext2D, page: Page, scale: number, imgs: Map<string, HTMLImageElement>) {
+export function renderPage(c: CanvasRenderingContext2D, page: Page, scale: number, imgs: Map<string, HTMLImageElement>, placeholders = false) {
   c.save();
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.scale(scale, scale);
@@ -177,12 +186,15 @@ export function renderPage(c: CanvasRenderingContext2D, page: Page, scale: numbe
     c.translate(l.x + l.w / 2, l.y + h / 2);
     c.rotate((l.rot * Math.PI) / 180);
     c.translate(-l.w / 2, -h / 2);
-    if (l.type === "photo") drawPhoto(c, l, imgs.get(l.src), scale);
+    if (l.type === "photo") drawPhoto(c, l, imgs.get(l.src), scale, placeholders);
     else if (l.type === "text") drawText(c, l);
     else {
       c.fillStyle = l.fill;
-      if (l.shape === "circle") { c.beginPath(); c.ellipse(l.w / 2, l.h / 2, l.w / 2, l.h / 2, 0, 0, Math.PI * 2); c.fill(); }
-      else { roundRect(c, 0, 0, l.w, l.h, l.radius); c.fill(); }
+      const sw = l.strokeW ?? 0;
+      if (l.shape === "circle") { c.beginPath(); c.ellipse(l.w / 2, l.h / 2, l.w / 2 - sw / 2, l.h / 2 - sw / 2, 0, 0, Math.PI * 2); }
+      else roundRect(c, sw / 2, sw / 2, l.w - sw, l.h - sw, l.radius);
+      c.fill();
+      if (sw > 0 && l.stroke) { c.lineWidth = sw; c.strokeStyle = l.stroke; c.stroke(); }
     }
     c.restore();
   }

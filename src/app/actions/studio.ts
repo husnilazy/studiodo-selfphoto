@@ -135,3 +135,26 @@ export async function deleteExport(id: number, _p: ActionState, _fd: FormData) {
     revalidatePath("/studio");
   });
 }
+
+/* ───────── Aset desain (logo, stiker) ───────── */
+export async function saveAsset(a: { name: string; url: string; w: number; h: number }) {
+  try {
+    const u = await actionUser();
+    if (!/^https?:\/\//i.test(a.url)) throw new Error("URL aset tidak valid.");
+    const [r] = await q<{ id: number }>("insert into design_assets (name, url, w, h, created_by) values ($1,$2,$3,$4,$5) returning id",
+      [(a.name.trim() || "Aset").slice(0, 80), a.url, int2(a.w), int2(a.h), u.id]);
+    revalidatePath("/studio");
+    return { ok: true as const, id: r.id };
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : "Gagal menyimpan aset." };
+  }
+}
+export async function deleteAsset(id: number) {
+  try {
+    await actionUser();
+    await q("delete from design_assets where id = $1", [id]);
+    return { ok: true as const };
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : "Gagal menghapus aset." };
+  }
+}

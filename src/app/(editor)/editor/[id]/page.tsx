@@ -1,8 +1,13 @@
 import { notFound } from "next/navigation";
 import EditorApp from "@/components/editor/EditorApp";
-import type { FrameRow } from "@/components/editor/LeftPanel";
+import type { AssetRow, FrameRow } from "@/components/editor/LeftPanel";
 import { requireUser } from "@/lib/auth";
 import { q } from "@/lib/db";
+import { getStudio } from "@/lib/data";
+import { getOnline } from "@/lib/online";
+import { getSiteConfig } from "@/lib/siteServer";
+import { imageSrc } from "@/lib/siteConfig";
+import type { Brand } from "@/lib/editor/templates";
 import { newBg, newPage, sizeById, type Design, type DesignKind } from "@/lib/editor/types";
 import { storageReady } from "@/lib/siteServer";
 
@@ -22,6 +27,16 @@ export default async function EditorPage({ params, searchParams }: { params: Pro
   const sp = await searchParams;
   const designId = rawId === "baru" ? null : Number(rawId);
   if (designId !== null && !Number.isInteger(designId)) notFound();
+
+  const [studio, site, online, assets] = await Promise.all([
+    getStudio(), getSiteConfig(), getOnline(),
+    q<AssetRow>("select id, name, url, w, h from design_assets order by created_at desc limit 120"),
+  ]);
+  const b = site.brand;
+  const brand: Brand = {
+    name: studio.name, logo: b.logo_url ? imageSrc(b.logo_url) : "", logoDark: b.logo_dark_url ? imageSrc(b.logo_dark_url) : "",
+    accent: b.accent, accent2: b.accent2, instagram: online.instagram, whatsapp: online.whatsapp, address: studio.address,
+  };
 
   const [frames, existing] = await Promise.all([
     q<FrameRow>("select id, name, category, url, w, h, slots from frames where active order by created_at desc"),
@@ -43,6 +58,6 @@ export default async function EditorPage({ params, searchParams }: { params: Pro
 
   return (
     <EditorApp initial={initial} designId={designId} storage={storageReady()} canManageFrames={user.role !== "kasir"} customer={customer}
-      frames={frames.map((f) => ({ ...f, slots: f.slots ?? [] }))} startFrame={Number(sp.frame) || null} />
+      frames={frames.map((f) => ({ ...f, slots: f.slots ?? [] }))} startFrame={Number(sp.frame) || null} brand={brand} assets={assets} />
   );
 }

@@ -48,5 +48,5 @@ export async function GET(req: Request) {
       out = "image/webp";
     } catch { /* tanpa sharp: kirim apa adanya */ }
   }
-  return new NextResponse(new Uint8Array(buf), { headers: { "Content-Type": out, "Cache-Control": "private, max-age=3600" } });
+  return new NextResponse(new Uint8Array(buf), { headers: { "Content-Type": out, "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox" } });
 }

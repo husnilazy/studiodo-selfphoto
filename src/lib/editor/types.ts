@@ -14,12 +14,14 @@ export type PhotoLayer = Base & {
   fit: "cover" | "contain"; flipX: boolean;
   radius: number; border: number; borderColor: string; shadow: boolean;
   filter: Filter; slot?: number;      // slot frame (kotak terkunci)
+  assetId?: string; color?: string;   // elemen vektor yang bisa diwarnai ulang
 };
 export type TextLayer = Base & {
   type: "text"; text: string; font: string; size: number; weight: number; italic: boolean; color: string;
   align: "left" | "center" | "right"; letter: number; lineHeight: number; shadow: boolean; bg: string; // bg = warna pill, "" = tanpa
+  stroke?: string; strokeW?: number; // outline teks
 };
-export type ShapeLayer = Base & { type: "shape"; shape: "rect" | "circle"; fill: string; radius: number };
+export type ShapeLayer = Base & { type: "shape"; shape: "rect" | "circle"; fill: string; radius: number; stroke?: string; strokeW?: number };
 export type FrameLayer = Base & { type: "frame"; src: string; slots: Slot[]; fw: number; fh: number };
 export type Layer = PhotoLayer | TextLayer | ShapeLayer | FrameLayer;
 
@@ -76,4 +78,9 @@ export const SIZES: SizePreset[] = [
 ];
 export const sizeById = (id: string) => SIZES.find((s) => s.id === id);
 
-export const FONTS = ["Sora", "Plus Jakarta Sans", "Georgia", "Playfair Display", "Arial", "Courier New", "Impact", "Brush Script MT"];
+export const FONTS = [
+  "Sora", "Plus Jakarta Sans", "Poppins", "Montserrat", "Playfair Display", "Bebas Neue", "Oswald", "Pacifico", "Dancing Script", "Lobster", "Caveat", "Abril Fatface",
+  "Georgia", "Arial", "Courier New", "Impact",
+];
+/** Font Google yang dimuat di editor (nama keluarga → parameter URL). */
+export const GOOGLE_FONTS = "family=Poppins:wght@400;600;800&family=Montserrat:wght@400;600;800&family=Playfair+Display:ital,wght@0,500;0,800;1,500&family=Bebas+Neue&family=Oswald:wght@400;700&family=Pacifico&family=Dancing+Script:wght@500;700&family=Lobster&family=Caveat:wght@500;700&family=Abril+Fatface";
