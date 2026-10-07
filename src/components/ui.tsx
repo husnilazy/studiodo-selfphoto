@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Icon from "./Icon";
+import CountUp from "./site/CountUp";
 
 export function PageHeader({
   title, subtitle, actions, back,
@@ -25,16 +26,16 @@ export function Badge({ tone = "slate", children }: { tone?: string; children: R
 }
 
 export function Stat({
-  label, value, hint, tone, icon,
-}: { label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: "ok" | "bad" | "accent"; icon?: string }) {
+  label, value, hint, tone, icon, i = 0,
+}: { label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: "ok" | "bad" | "accent"; icon?: string; i?: number }) {
   const color = tone === "ok" ? "text-ok" : tone === "bad" ? "text-bad" : tone === "accent" ? "text-accent" : "";
   return (
-    <div className="card anim-rise p-4">
+    <div className="card hover-lift anim-rise p-4" style={{ ["--i" as string]: i }}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-muted">{label}</p>
         {icon && <span className="grid size-8 place-items-center rounded-xl bg-accentsoft text-accent"><Icon name={icon} className="size-4" /></span>}
       </div>
-      <p className={`font-display tnum mt-1 text-xl font-semibold sm:text-2xl ${color}`}>{value}</p>
+      <p className={`font-display tnum mt-1 text-xl font-semibold sm:text-2xl ${color}`}>{typeof value === "string" || typeof value === "number" ? <CountUp value={String(value)} /> : value}</p>
       {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
     </div>
   );

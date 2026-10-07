@@ -11,6 +11,7 @@ const img = (fd: FormData) => {
   if (u && !/^https?:\/\//i.test(u)) throw new Error("Link foto harus diawali http:// atau https://");
   return u;
 };
+const pct = (fd: FormData, k: string) => Math.min(100, Math.max(0, int(fd, k)));
 const CATS = ["self_photo", "photobox", "photobooth", "wisuda", "keluarga", "lainnya"];
 const TABLES = { packages: "packages", rooms: "rooms", addons: "addons" } as const;
 
@@ -27,15 +28,17 @@ export async function savePackage(id: number | null, _p: ActionState, fd: FormDa
     const optionLabel = str(fd, "option_label").slice(0, 40);
     const options = parseOptions(str(fd, "options")).join("\n");
     if (options && !optionLabel) throw new Error("Isi nama pilihan (mis. Warna background) bila ada daftar pilihan.");
+    const size = ["sm", "md", "lg"].includes(str(fd, "image_size")) ? str(fd, "image_size") : "md";
+    const fit = str(fd, "image_fit") === "contain" ? "contain" : "cover";
     const v = [name, category, str(fd, "description"), str(fd, "includes"), price, duration, Math.max(1, int(fd, "max_people")), bool(fd, "active"), img(fd),
-      fd.get("pricing") === "per_person", bool(fd, "bookable_online"), optionLabel, options];
+      fd.get("pricing") === "per_person", bool(fd, "bookable_online"), optionLabel, options, size, fit, pct(fd, "image_x"), pct(fd, "image_y")];
     const roomIds = [...new Set(fd.getAll("room_ids").map((x) => Number(x)).filter((n) => Number.isInteger(n) && n > 0))];
     await tx(async (t) => {
       let pid = id;
       if (id) {
-        await t("update packages set name=$1, category=$2, description=$3, includes=$4, price=$5, duration_min=$6, max_people=$7, active=$8, image_url=$9, per_person=$10, bookable_online=$11, option_label=$12, options=$13 where id=$14", [...v, id]);
+        await t("update packages set name=$1, category=$2, description=$3, includes=$4, price=$5, duration_min=$6, max_people=$7, active=$8, image_url=$9, per_person=$10, bookable_online=$11, option_label=$12, options=$13, image_size=$14, image_fit=$15, image_x=$16, image_y=$17 where id=$18", [...v, id]);
       } else {
-        const [r] = await t<{ id: number }>("insert into packages (name, category, description, includes, price, duration_min, max_people, active, image_url, per_person, bookable_online, option_label, options) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning id", v);
+        const [r] = await t<{ id: number }>("insert into packages (name, category, description, includes, price, duration_min, max_people, active, image_url, per_person, bookable_online, option_label, options, image_size, image_fit, image_x, image_y) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning id", v);
         pid = r.id;
       }
       await t("delete from package_rooms where package_id = $1", [pid]);

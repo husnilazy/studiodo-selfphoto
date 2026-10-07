@@ -71,13 +71,13 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       )}
 
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Sesi hari ini" value={live.length} hint={`${live.filter((b) => b.status === "done").length} selesai`} icon="camera" />
-        <Stat label="Pemasukan hari ini" value={rupiah(todayPay)} icon="dollar" tone="accent" />
-        <Stat label={`Pemasukan ${fmtMonth(today).split(" ")[0]}`} value={rupiah(monthIncome)} hint={`${month.sessions} sesi · ${month.people} orang`} icon="chart" />
+        <Stat i={0} label="Sesi hari ini" value={live.length} hint={`${live.filter((b) => b.status === "done").length} selesai`} icon="camera" />
+        <Stat i={1} label="Pemasukan hari ini" value={rupiah(todayPay)} icon="dollar" tone="accent" />
+        <Stat i={2} label={`Pemasukan ${fmtMonth(today).split(" ")[0]}`} value={rupiah(monthIncome)} hint={`${month.sessions} sesi · ${month.people} orang`} icon="chart" />
         {extra ? (
-          <Stat label="Laba bersih bulan ini" value={rupiah(extra[0].net)} tone={extra[0].net >= 0 ? "ok" : "bad"} icon="wallet" hint={`Pendapatan ${rupiah(extra[0].revenue)}`} />
+          <Stat i={3} label="Laba bersih bulan ini" value={rupiah(extra[0].net)} tone={extra[0].net >= 0 ? "ok" : "bad"} icon="wallet" hint={`Pendapatan ${rupiah(extra[0].revenue)}`} />
         ) : (
-          <Stat label="Booking 7 hari ke depan" value={upcoming.length >= 5 ? "5+" : upcoming.length} icon="calendar" />
+          <Stat i={4} label="Booking 7 hari ke depan" value={upcoming.length >= 5 ? "5+" : upcoming.length} icon="calendar" />
         )}
       </div>
 

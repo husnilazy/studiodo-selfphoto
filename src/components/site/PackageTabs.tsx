@@ -1,10 +1,10 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import Icon from "../Icon";
-import { CATEGORY_LABEL, rupiah } from "@/lib/format";
+import PackageCardView from "../PackageCardView";
+import { CATEGORY_LABEL } from "@/lib/format";
 
-type P = { id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; image_url: string; per_person: boolean; bookable_online: boolean };
+type P = { id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; image_url: string; image_size?: string; image_fit?: string; image_x?: number; image_y?: number; per_person: boolean; bookable_online: boolean };
 
 const BLURB: Record<string, string> = {
   self_photo: "Foto sendiri di studio, atur pose dan ekspresimu sepuasnya.",
@@ -37,33 +37,10 @@ export default function PackageTabs({ packages, bookingOpen }: { packages: P[]; 
 
       <div key={cat} className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {list.map((p, i) => (
-          <article key={p.id} className="step-in glass lift spot group flex flex-col overflow-hidden rounded-3xl" style={{ animationDelay: `${i * 70}ms` }}>
-            {p.image_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={p.image_url} alt={p.name} loading="lazy" className="h-44 w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-            ) : (
-              <div className="relative h-24 overflow-hidden" style={{ background: "linear-gradient(135deg, color-mix(in oklab, var(--accent) 28%, transparent), color-mix(in oklab, var(--accent-2) 22%, transparent))" }}>
-                <Icon name="camera" className="absolute -bottom-4 -right-2 size-24 -rotate-12 text-accent/20 transition-transform duration-700 group-hover:rotate-0" />
-              </div>
-            )}
-            <div className="flex flex-1 flex-col p-6">
-              <h3 className="font-display text-xl font-semibold leading-tight">{p.name}</h3>
-              <p className="mt-1 text-sm text-muted">{p.duration_min} menit · hingga {p.max_people} orang</p>
-              {(p.description || p.includes) && (
-                <ul className="mt-4 space-y-1.5 text-sm">
-                  {[p.description, ...p.includes.split(/\n|,/)].map((t) => t.trim()).filter(Boolean).slice(0, 5).map((t) => (
-                    <li key={t} className="flex gap-2"><Icon name="check" className="mt-0.5 size-4 shrink-0 text-accent" /><span>{t}</span></li>
-                  ))}
-                </ul>
-              )}
-              <div className="mt-auto flex items-end justify-between gap-3 pt-6">
-                <p className="font-display text-2xl font-bold tracking-tight text-accent">{rupiah(p.price)}<span className="ml-1 text-sm font-semibold text-muted">{p.per_person ? "/ orang" : "/ sesi"}</span></p>
-                {bookingOpen && (p.bookable_online
-                  ? <Link href={`/book?paket=${p.id}`} className="btn btn-primary !min-h-10 !rounded-full !px-5">Pilih</Link>
-                  : <span className="badge badge-amber !px-3 !py-1.5">Langsung datang</span>)}
-              </div>
-            </div>
-          </article>
+          <PackageCardView key={p.id} p={p} className="step-in" style={{ animationDelay: `${i * 70}ms` }}
+            footer={bookingOpen && (p.bookable_online
+              ? <Link href={`/book?paket=${p.id}`} className="btn btn-primary !min-h-10 !rounded-full !px-5">Pilih</Link>
+              : <span className="badge badge-amber !px-3 !py-1.5">Langsung datang</span>)} />
         ))}
       </div>
     </div>

@@ -49,7 +49,7 @@ export default async function CustomerDetail({ params }: { params: Promise<{ id:
         <Stat label="Total sesi" value={done.length} icon="camera" />
         <Stat label="Total belanja" value={rupiah(spent)} icon="dollar" />
         <Stat label="Rata-rata / sesi" value={rupiah(done.length ? Math.round(spent / done.length) : 0)} icon="chart" />
-        <Stat label="Terakhir datang" value={last ? fmtDate(dateWIB(last.start_at), { short: true }) : "—"} icon="clock" />
+        <Stat label="Terakhir datang" value={<>{last ? fmtDate(dateWIB(last.start_at), { short: true }) : "—"}</>} icon="clock" />
       </div>
       {c.notes && <p className="card mb-5 p-4 text-sm"><span className="mb-1 block text-xs font-bold uppercase tracking-wide text-muted">Catatan</span>{c.notes}</p>}
 

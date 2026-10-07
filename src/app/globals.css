@@ -212,3 +212,43 @@ details[open] .faq-plus { transform: rotate(45deg); }
 /* Header situs: kaca tipis tanpa garis tepi penuh (hanya garis halus di bawah), tetap menempel saat scroll */
 .nav-base { background-color: transparent; border-bottom: 1px solid transparent; transition: background-color .35s ease, border-color .35s ease, box-shadow .35s ease, backdrop-filter .35s ease; }
 .nav-glass { @apply backdrop-blur-[12px] backdrop-saturate-[1.25]; background-color: color-mix(in oklab, var(--bg) 62%, transparent); border-bottom-color: color-mix(in oklab, var(--line) 55%, transparent); box-shadow: 0 10px 30px -22px rgba(0,0,0,.45); }
+
+/* ───────── Admin: gerak halus & interaktif ───────── */
+.anim-rise { animation-delay: calc(var(--i, 0) * 55ms); }
+@keyframes page-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.page-in { animation: page-in .38s cubic-bezier(.2,.8,.2,1) both; }
+.nav-pill { transition: transform .45s cubic-bezier(.3,1.25,.4,1), height .3s ease; }
+.hover-lift { transition: transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s ease, border-color .25s ease; }
+.hover-lift:hover { transform: translateY(-4px); box-shadow: 0 18px 38px -20px var(--accent); border-color: color-mix(in oklab, var(--accent) 45%, var(--line)); }
+.hover-lift:active { transform: translateY(-1px) scale(.985); }
+.card { transition: box-shadow .3s ease, border-color .25s ease; }
+.btn-shine { position: relative; overflow: hidden; }
+.btn-shine::after { content: ""; position: absolute; inset: 0; transform: translateX(-120%) skewX(-18deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); transition: transform .7s ease; }
+.btn-shine:hover::after { transform: translateX(120%) skewX(-18deg); }
+.btn-primary:hover { box-shadow: 0 10px 24px -8px var(--accent); }
+.input:hover:not(:focus) { border-color: color-mix(in oklab, var(--accent) 35%, var(--line)); }
+.chip:hover { border-color: color-mix(in oklab, var(--accent) 50%, var(--line)); transform: translateY(-1px); }
+.table tbody tr { transition: background-color .15s ease; }
+.table tbody tr:hover { background: color-mix(in oklab, var(--accent) 6%, transparent); }
+
+@keyframes toast-in { from { opacity: 0; transform: translateY(16px) scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes toast-out { to { opacity: 0; transform: translateY(10px) scale(.96); } }
+.toast { animation: toast-in .35s cubic-bezier(.2,.8,.2,1) both; }
+.toast-out { animation: toast-out .3s ease forwards; }
+
+/* Sheet: masuk & keluar */
+@keyframes sheet-down { to { transform: translateY(100%); } }
+@keyframes pop-out { to { opacity: 0; transform: scale(.96) translateY(8px); } }
+@keyframes fade-out { to { opacity: 0; } }
+.sheet-panel { animation: sheet-up .32s cubic-bezier(.2,.8,.2,1) both; }
+@media (min-width: 640px) { .sheet-panel { animation: pop .28s cubic-bezier(.2,.8,.2,1) both; } }
+.sheet-closing .sheet-panel { animation: sheet-down .22s ease-in forwards; }
+@media (min-width: 640px) { .sheet-closing .sheet-panel { animation: pop-out .2s ease-in forwards; } }
+.sheet-closing .sheet-bg { animation: fade-out .22s ease forwards; }
+
+/* Ganti tema dengan transisi warna lembut */
+html.theming, html.theming *, html.theming *::before, html.theming *::after { transition: background-color .4s ease, color .4s ease, border-color .4s ease, fill .4s ease !important; }
+
+/* Kartu paket di website */
+.pkg-card:hover .pkg-img { filter: saturate(1.08); }
+@media (prefers-reduced-motion: reduce) { .page-in, .toast, .sheet-panel { animation: none; } .nav-pill { transition: none; } }

@@ -5,18 +5,22 @@ import MoneyInput from "@/components/MoneyInput";
 import { Badge, Empty, Field, PageHeader, Tabs } from "@/components/ui";
 import { q } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { storageReady } from "@/lib/siteServer";
+import PackageImageEditor from "@/components/PackageImageEditor";
 import { CATEGORY_LABEL, rupiah } from "@/lib/format";
-import { priceSuffix } from "@/lib/packageUtils";
+import { imageStyle, priceSuffix } from "@/lib/packageUtils";
+import { imageSrc } from "@/lib/siteConfig";
 import { deleteCatalog, saveAddon, savePackage, saveRoom } from "@/app/actions/catalog";
 
 export const metadata = { title: "Paket & Ruang" };
 
-type Pkg = { per_person: boolean; bookable_online: boolean; option_label: string; options: string; room_ids: number[]; image_url: string; id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; active: boolean };
+type Pkg = { image_size: string; image_fit: string; image_x: number; image_y: number; per_person: boolean; bookable_online: boolean; option_label: string; options: string; room_ids: number[]; image_url: string; id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; active: boolean };
 type Room = { image_url: string; id: number; name: string; color: string; description: string; active: boolean };
 type Addon = { id: number; name: string; price: number; active: boolean };
 
 export default async function PaketPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   await requireUser(["owner", "admin"]);
+  const storage = storageReady();
   const tab = (await searchParams).tab ?? "paket";
   const [pkgs, rooms, addons] = await Promise.all([
     q<Pkg>("select p.*, coalesce((select array_agg(pr.room_id) from package_rooms pr where pr.package_id = p.id), '{}') as room_ids from packages p order by p.active desc, case p.category when 'self_photo' then 0 when 'photobox' then 1 when 'photobooth' then 2 else 3 end, p.price"),
@@ -37,14 +41,19 @@ export default async function PaketPage({ searchParams }: { searchParams: Promis
         <section>
           <div className="mb-4 flex justify-end">
             <Sheet title="Paket Baru" wide trigger={<button className="btn btn-primary"><Icon name="plus" className="size-4" /> Tambah Paket</button>}>
-              <PackageForm rooms={rooms} />
+              <PackageForm rooms={rooms} storage={storage} />
             </Sheet>
           </div>
           {pkgs.length === 0 ? <Empty title="Belum ada paket" hint="Tambahkan paket pertama, mis. Self Photo 30 menit." /> : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {pkgs.map((p) => (
+              {pkgs.map((p, i) => (
                 <Sheet key={p.id} title="Edit Paket" wide trigger={
-                  <button className={`card anim-rise p-4 text-left transition active:scale-[.98] ${p.active ? "" : "opacity-55"}`}>
+                  <button className={`card hover-lift anim-rise overflow-hidden text-left active:scale-[.98] ${p.active ? "" : "opacity-55"}`} style={{ ["--i" as string]: Math.min(i, 8) }}>
+                    {p.image_url && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={imageSrc(p.image_url)} alt="" loading="lazy" style={imageStyle(p)} className="h-28 w-full bg-panel2" />
+                    )}
+                    <div className="p-4">
                     <div className="flex items-start justify-between gap-2">
                       <Badge tone="indigo">{CATEGORY_LABEL[p.category]}</Badge>
                       {!p.active && <Badge>Nonaktif</Badge>}
@@ -54,8 +63,9 @@ export default async function PaketPage({ searchParams }: { searchParams: Promis
                     {!p.bookable_online && <p className="mt-1 text-xs font-semibold text-warn">Walk-in saja (tanpa booking online)</p>}
                     <p className="mt-1 text-xs text-muted">{p.duration_min} menit · maks {p.max_people} orang</p>
                     {p.includes && <p className="mt-2 line-clamp-2 text-xs text-muted">{p.includes}</p>}
+                    </div>
                   </button>}>
-                  <PackageForm pkg={p} rooms={rooms} />
+                  <PackageForm pkg={p} rooms={rooms} storage={storage} />
                 </Sheet>
               ))}
             </div>
@@ -129,7 +139,7 @@ function DeleteRow({ table, id }: { table: "packages" | "rooms" | "addons"; id: 
   );
 }
 
-function PackageForm({ pkg, rooms }: { pkg?: Pkg; rooms: Room[] }) {
+function PackageForm({ pkg, rooms, storage }: { pkg?: Pkg; rooms: Room[]; storage: boolean }) {
   return (
     <>
       <ActionForm action={savePackage.bind(null, pkg?.id ?? null)}>
@@ -152,7 +162,9 @@ function PackageForm({ pkg, rooms }: { pkg?: Pkg; rooms: Room[] }) {
         </div>
         <Field label="Termasuk (opsional)"><textarea name="includes" className="input" defaultValue={pkg?.includes} placeholder="mis. 1 cetak 4R, semua soft file" /></Field>
         <Field label="Deskripsi (opsional, tampil di website)"><textarea name="description" className="input" defaultValue={pkg?.description} /></Field>
-        <Field label="Link foto (opsional)" hint="Tempel link gambar (https://…) untuk tampil di website."><input name="image_url" type="url" className="input" defaultValue={pkg?.image_url} /></Field>
+        <PackageImageEditor storage={storage} initial={{ name: pkg?.name ?? "", category: pkg?.category ?? "self_photo", description: pkg?.description ?? "", includes: pkg?.includes ?? "", price: pkg?.price ?? 0,
+          duration_min: pkg?.duration_min ?? 30, max_people: pkg?.max_people ?? 2, per_person: pkg?.per_person ?? false,
+          image_url: pkg?.image_url ?? "", image_size: pkg?.image_size ?? "md", image_fit: pkg?.image_fit ?? "cover", image_x: pkg?.image_x ?? 50, image_y: pkg?.image_y ?? 50 }} />
         <div className="grid grid-cols-2 gap-3">
           <Field label="Nama pilihan (opsional)" hint="mis. Warna background, Tema"><input name="option_label" className="input" defaultValue={pkg?.option_label} placeholder="Warna background" /></Field>
           <Field label="Daftar pilihan" hint="Satu per baris"><textarea name="options" className="input !min-h-[4.5rem]" defaultValue={pkg?.options} placeholder={"Soft Pink\nAesthetic Beige\nWarm Grey"} /></Field>

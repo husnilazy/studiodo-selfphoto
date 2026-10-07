@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { prepareMediaUpload, saveSite } from "@/app/actions/website";
+import { uploadToStorage } from "@/lib/uploadClient";
 import { FONT_FAMILY, FONT_OPTIONS, SECTION_LABEL, imageSrc, mediaKind, type Heading, type SectionKey, type SiteConfig } from "@/lib/siteConfig";
 
 type Upd = (fn: (d: SiteConfig) => void) => void;
@@ -100,26 +101,6 @@ function HeadingFields({ h, onChange }: { h: Heading; onChange: (fn: (h: Heading
       <div className="sm:col-span-2"><Txt label="Sub-judul" value={h.subtitle} onChange={(v) => onChange((x) => { x.subtitle = v; })} /></div>
     </Grid>
   );
-}
-
-/** Unggah satu file ke Supabase Storage (URL bertanda tangan) dan kembalikan URL publiknya. */
-async function uploadToStorage(file: File, onPct?: (n: number) => void): Promise<{ url?: string; error?: string }> {
-  const p = await prepareMediaUpload(file.name, file.type, file.size);
-  if (!p.ok) return { error: p.error };
-  const fd = new FormData();
-  fd.append("cacheControl", "31536000");
-  fd.append("", file);
-  return new Promise((resolve) => {
-    const x = new XMLHttpRequest();
-    x.open("PUT", p.uploadUrl);
-    x.setRequestHeader("apikey", p.anonKey);
-    x.setRequestHeader("Authorization", `Bearer ${p.anonKey}`);
-    x.setRequestHeader("x-upsert", "false");
-    x.upload.onprogress = (e) => e.lengthComputable && onPct?.(Math.round((e.loaded / e.total) * 100));
-    x.onload = () => resolve(x.status >= 200 && x.status < 300 ? { url: p.publicUrl } : { error: `Upload gagal (${x.status}). ${x.responseText.slice(0, 120)}` });
-    x.onerror = () => resolve({ error: "Koneksi terputus saat upload." });
-    x.send(fd);
-  });
 }
 
 /** Isian link media dengan tombol upload (Supabase Storage) bila diaktifkan. */

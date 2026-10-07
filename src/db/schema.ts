@@ -245,6 +245,10 @@ insert into accounts (code, name, type, subtype, cf_category, is_system, sort) v
  ('4107','Pendapatan Foto Keluarga & Pas Foto','revenue','sales','operating',true,46)
 on conflict (code) do nothing;
 alter table packages add column if not exists image_url text not null default '';
+alter table packages add column if not exists image_size text not null default 'md';
+alter table packages add column if not exists image_fit text not null default 'cover';
+alter table packages add column if not exists image_x int not null default 50;
+alter table packages add column if not exists image_y int not null default 50;
 
 -- Monitoring sesi live
 alter table bookings add column if not exists started_at timestamptz;

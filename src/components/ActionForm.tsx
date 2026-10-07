@@ -1,7 +1,8 @@
 "use client";
-import { createContext, startTransition, useActionState, useContext, useEffect } from "react";
+import { createContext, startTransition, useActionState, useContext, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSheet } from "./Sheet";
+import { toast } from "./Toaster";
 
 export type ActionState = { ok?: boolean; error?: string; message?: string; redirect?: string } | null;
 export type Action = (prev: ActionState, fd: FormData) => Promise<ActionState>;
@@ -21,8 +22,11 @@ export default function ActionForm({
   const [state, run, pending] = useActionState(action, null);
   const sheet = useSheet();
   const router = useRouter();
+  const handled = useRef<unknown>(null);
   useEffect(() => {
-    if (state?.ok) {
+    if (state?.ok && handled.current !== state) {
+      handled.current = state;
+      if (!state.redirect) toast(state.message || "Berhasil disimpan");
       sheet?.close();
       if (state.redirect) router.push(state.redirect);
       else router.refresh();
