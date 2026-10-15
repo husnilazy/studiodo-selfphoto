@@ -4,6 +4,7 @@ type Item = { href: string; label: string; icon: string; roles: Role[] };
 export const NAV: Item[] = [
   { href: "/dashboard", label: "Beranda", icon: "home", roles: ["owner", "admin", "kasir"] },
   { href: "/live", label: "Sesi Live", icon: "clock", roles: ["owner", "admin", "kasir"] },
+  { href: "/shift", label: "Shift Kasir", icon: "dollar", roles: ["owner", "admin", "kasir"] },
   { href: "/booking", label: "Booking", icon: "calendar", roles: ["owner", "admin", "kasir"] },
   { href: "/customer", label: "Customer", icon: "users", roles: ["owner", "admin", "kasir"] },
   { href: "/file", label: "File Customer", icon: "folder", roles: ["owner", "admin", "kasir"] },

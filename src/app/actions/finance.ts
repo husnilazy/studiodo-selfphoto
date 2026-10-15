@@ -4,6 +4,7 @@ import { q as rootQ, tx } from "@/lib/db";
 import { actionUser } from "@/lib/auth";
 import { int, req, safe, str } from "@/lib/action";
 import { postJournal, voidJournal } from "@/lib/ledger";
+import { linkCashMove } from "@/lib/shift";
 import { fmtMonth, monthEnd, rupiah, todayWIB } from "@/lib/format";
 import type { ActionState } from "@/components/ActionForm";
 
@@ -40,6 +41,7 @@ export async function addExpense(_p: ActionState, fd: FormData) {
         lines: [{ account: exp.code, debit: amount }, { account: src.code, credit: amount }],
       });
       await q("update expenses set journal_id = $1 where id = $2", [jid, e.id]);
+      if (src.code === "1101") await linkCashMove(q, { delta: -amount, note: `Pengeluaran${vendor ? ` – ${vendor}` : ""}${note ? ` (${note})` : ""}`, userId: user.id, expenseId: e.id });
     });
     refresh();
   });
@@ -54,6 +56,7 @@ export async function voidExpense(id: number, _p: ActionState, _fd: FormData) {
       if (e.voided) return;
       await q("update expenses set voided = true where id = $1", [id]);
       if (e.journal_id) await voidJournal(q, e.journal_id);
+      await q("update shift_moves set voided = true where expense_id = $1", [id]);
     });
     refresh();
   });
@@ -87,10 +90,13 @@ export async function cashTxn(_p: ActionState, fd: FormData) {
         if (t.code === cash.code) throw new Error("Akun asal dan tujuan tidak boleh sama.");
         to = t.code;
       }
-      await postJournal(q, {
+      const jid = await postJournal(q, {
         date, memo: `${def.label}${str(fd, "note") ? ` – ${str(fd, "note")}` : ""}`, refType: "cash", userId: user.id,
         lines: def.build(cash.code, null, amount, to),
       });
+      // Pengaruh ke laci (akun 1101): debit = uang masuk laci, kredit = uang keluar laci.
+      const drawer = def.build(cash.code, null, amount, to).reduce((s, l) => l.account === "1101" ? s + (l.debit ?? 0) - (l.credit ?? 0) : s, 0);
+      await linkCashMove(q, { delta: drawer, note: `${def.label}${str(fd, "note") ? ` – ${str(fd, "note")}` : ""}`, userId: user.id, journalId: jid });
     });
     refresh();
   });
@@ -127,6 +133,7 @@ export async function voidManualJournal(id: number, _p: ActionState, _fd: FormDa
       if (!["manual", "cash", "depreciation"].includes(j.ref_type)) throw new Error("Jurnal ini dibuat otomatis dari transaksi lain. Batalkan lewat transaksi asalnya.");
       if (j.ref_type === "depreciation") await q("delete from asset_depreciation where journal_id = $1", [id]);
       await voidJournal(q, id);
+      await q("update shift_moves set voided = true where journal_id = $1", [id]);
     });
     refresh();
   });

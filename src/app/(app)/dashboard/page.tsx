@@ -6,6 +6,7 @@ import { Empty, Stat } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { q } from "@/lib/db";
 import { listBookings } from "@/lib/data";
+import { getOpenShift } from "@/lib/shift";
 import { expireStalePending } from "@/lib/online";
 import { cashBalances, incomeStatement, salesSummary } from "@/lib/reports";
 import { addDays, fmtDate, fmtMonth, monthEnd, monthStart, rupiah, todayWIB } from "@/lib/format";
@@ -48,6 +49,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   return (
     <>
       {sp.akses === "ditolak" && <p className="mb-4 rounded-xl bg-warnsoft px-4 py-3 text-sm font-semibold text-warn">Akun Anda tidak punya akses ke halaman itu.</p>}
+      {!(await getOpenShift()) && (
+        <Link href="/shift" className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-warnsoft px-4 py-3 text-sm font-semibold text-warn">
+          <span>Shift kasir belum dibuka — pembayaran belum bisa dicatat.</span><span className="shrink-0">Buka shift →</span>
+        </Link>
+      )}
       <div className="anim-rise mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-muted">{fmtDate(today, { weekday: true })}</p>

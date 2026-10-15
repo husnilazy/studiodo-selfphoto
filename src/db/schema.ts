@@ -1,7 +1,7 @@
 // Skema database STUDIODO Kasir (PostgreSQL / Supabase). Idempotent: aman dijalankan berulang.
 // Semua nilai uang disimpan sebagai bigint rupiah (tanpa desimal).
 // NAIKKAN versi ini setiap kali SCHEMA diubah agar database yang sudah ada ikut ter-upgrade.
-export const SCHEMA_VERSION = "2026-10-08.2";
+export const SCHEMA_VERSION = "2026-10-15.3";
 
 export const SCHEMA = `
 create table if not exists users (
@@ -368,6 +368,44 @@ alter table design_assets enable row level security;
 -- Monitoring sesi live
 alter table bookings add column if not exists started_at timestamptz;
 alter table bookings add column if not exists finished_at timestamptz;
+
+-- Shift kasir: buka/tutup laci. Satu laci => hanya boleh ada satu shift terbuka.
+create table if not exists shifts (
+  id serial primary key,
+  opened_by int references users(id),
+  opened_at timestamptz not null default now(),
+  opening_cash bigint not null default 0,
+  open_note text not null default '',
+  closed_by int references users(id),
+  closed_at timestamptz,
+  expected_cash bigint,
+  counted_cash bigint,
+  difference bigint,
+  sales_cash bigint,
+  sales_qris bigint,
+  sales_transfer bigint,
+  cash_out bigint,
+  close_note text not null default '',
+  diff_journal_id int references journals(id)
+);
+create unique index if not exists shifts_one_open_idx on shifts ((true)) where closed_at is null;
+alter table shifts enable row level security;
+create table if not exists shift_moves (
+  id serial primary key,
+  shift_id int not null references shifts(id) on delete cascade,
+  amount bigint not null check (amount > 0),
+  note text not null default '',
+  expense_id int references expenses(id),
+  voided boolean not null default false,
+  created_by int references users(id),
+  created_at timestamptz not null default now()
+);
+alter table shift_moves enable row level security;
+alter table shifts add column if not exists cash_in bigint;
+alter table shift_moves add column if not exists kind text not null default 'out';
+alter table shift_moves add column if not exists journal_id int;
+alter table payments add column if not exists shift_id int references shifts(id);
+create index if not exists payments_shift_idx on payments (shift_id);
 
 -- Bagan akun standar (bisa ditambah dari menu Keuangan > Akun)
 insert into accounts (code, name, type, subtype, cf_category, is_system, sort) values

@@ -6,6 +6,7 @@ import { bool, int, req, safe, str } from "@/lib/action";
 import { allocateRevenue, METHOD_ACCOUNT, postJournal, voidJournal } from "@/lib/ledger";
 import { dateWIB, fromWIB, rupiah } from "@/lib/format";
 import { checkConflict, genCode } from "@/lib/bookingUtils";
+import { getOpenShift } from "@/lib/shift";
 import { buildQuote } from "@/lib/pricingServer";
 import type { DiscountLine } from "@/lib/pricing";
 import { parseOptions, roomAllowed, unitsFor } from "@/lib/packageUtils";
@@ -95,9 +96,11 @@ async function recordPayment(q: Q, bookingId: number, p: { kind: "dp" | "payment
   const cash = METHOD_ACCOUNT[p.method];
   const paidAt = p.paidAt ?? new Date();
   const refund = p.kind === "refund";
+  const shift = await getOpenShift(q);
+  if (!shift) throw new Error("Shift kasir belum dibuka. Buka shift dulu di menu Shift Kasir agar uang masuk tercatat di laci.");
   const [pay] = await q<{ id: number }>(
-    "insert into payments (booking_id, kind, method, amount, paid_at, note, created_by) values ($1,$2,$3,$4,$5,$6,$7) returning id",
-    [bookingId, p.kind, p.method, p.amount, paidAt.toISOString(), p.note ?? "", p.userId]);
+    "insert into payments (booking_id, kind, method, amount, paid_at, note, created_by, shift_id) values ($1,$2,$3,$4,$5,$6,$7,$8) returning id",
+    [bookingId, p.kind, p.method, p.amount, paidAt.toISOString(), p.note ?? "", p.userId, shift.id]);
   const jid = await postJournal(q, {
     date: dateWIB(paidAt),
     memo: `${refund ? "Refund" : p.kind === "dp" ? "DP" : "Pembayaran"} booking ${b.code}`,
