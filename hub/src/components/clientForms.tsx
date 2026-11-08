@@ -5,14 +5,14 @@ import { generateApiKey, importCsv, loginAction, pullNow, runAI, setupAction, ty
 const Msg = ({ s }: { s: FormState }) =>
   s?.error ? <p className="rounded-lg bg-bad/15 px-3 py-2 text-sm text-bad">{s.error}</p> : s?.ok ? <p className="rounded-lg bg-ok/15 px-3 py-2 text-sm text-ok">{s.ok}</p> : null;
 
-export function LoginForm({ users }: { users: { id: number; name: string }[] }) {
+export function LoginForm() {
   const [st, act, pending] = useActionState(loginAction, null);
   return (
     <form action={act} className="space-y-4">
-      <label className="block"><span className="label">Pengguna</span>
-        <select name="user" className="input" defaultValue={users[0]?.id}>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>
+      <label className="block"><span className="label">Nama pengguna</span>
+        <input name="name" className="input" autoComplete="username" required autoFocus placeholder="Nama yang didaftarkan Owner" /></label>
       <label className="block"><span className="label">PIN 6 digit</span>
-        <input name="pin" type="password" inputMode="numeric" maxLength={6} autoComplete="current-password" className="input tnum tracking-[.5em]" required autoFocus /></label>
+        <input name="pin" type="password" inputMode="numeric" maxLength={6} autoComplete="current-password" className="input tnum tracking-[.5em]" required /></label>
       <Msg s={st} />
       <button className="btn btn-primary w-full" disabled={pending}>{pending ? "Memeriksa…" : "Masuk"}</button>
     </form>

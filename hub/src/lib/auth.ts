@@ -5,8 +5,11 @@ import { redirect } from "next/navigation";
 import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { one, q } from "./db";
 
-export type Role = "owner" | "partner";
-export type User = { id: number; name: string; role: Role };
+/** owner: ubah semua · partner: lihat semua · investor: ringkasan + modal sendiri + dokumen · karyawan: slip & dokumen sendiri */
+export type Role = "owner" | "partner" | "investor" | "karyawan";
+export type User = { id: number; name: string; role: Role; employeeId: number | null; partnerId: number | null };
+export const ROLE_LABEL: Record<Role, string> = { owner: "Owner", partner: "Partner (lihat semua)", investor: "Investor", karyawan: "Karyawan" };
+export const isTeam = (u: { role: Role }) => u.role === "owner" || u.role === "partner";
 const COOKIE = "fh_session";
 const MAX_AGE = 60 * 60 * 24 * 30;
 
@@ -48,12 +51,18 @@ export const currentUser = cache(async function currentUser(): Promise<User | nu
   const expect = sign(`${id}.${exp}`);
   if (sig.length !== expect.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expect))) return null;
   if (Number(exp) < Date.now() / 1000) return null;
-  return one<User>("select id, name, role from users where id = $1 and active", [Number(id)]);
+  return one<User>('select id, name, role, employee_id as "employeeId", partner_id as "partnerId" from users where id = $1 and active', [Number(id)]);
 });
 
 export async function requireUser(): Promise<User> {
   const u = await currentUser();
   if (!u) redirect("/login");
+  return u;
+}
+/** Halaman tim (owner & partner). Investor/karyawan diarahkan ke area mereka. */
+export async function requireTeam(): Promise<User> {
+  const u = await requireUser();
+  if (!isTeam(u)) redirect("/saya");
   return u;
 }
 /** Hanya Owner yang boleh mengubah data. Partner = lihat saja. */

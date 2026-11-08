@@ -3,12 +3,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 /** Menyegarkan data halaman secara berkala (realtime ringan) dan saat tab kembali aktif. */
-export default function LiveRefresh({ every = 20 }: { every?: number }) {
+export default function LiveRefresh({ every = 45 }: { every?: number }) {
   const router = useRouter();
   const [at, setAt] = useState<string>("");
   useEffect(() => {
     const tick = () => {
       if (document.visibilityState !== "visible") return;
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return; // jangan mengganggu saat mengisi form
       router.refresh();
       setAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
     };

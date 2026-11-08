@@ -1,7 +1,8 @@
 import { q } from "@/lib/db";
-import { currentUser } from "@/lib/auth";
+import { currentUser, ROLE_LABEL, type Role } from "@/lib/auth";
+import { listEmployees } from "@/lib/payroll";
 import { loadFacts } from "@/lib/metrics";
-import { addCompany, addPartner, addUserAction, clearDemo, loadDemo, savePartnerLink } from "@/app/actions";
+import { addCompany, addPartner, addUserAction, clearDemo, loadDemo, resetUserPin, savePartnerLink, toggleUser } from "@/app/actions";
 import { ApiKeyButton, PullButton } from "@/components/clientForms";
 import { configured, SOURCES } from "@/lib/pull";
 import { CompanyDot, Field, PageHead, Pill } from "@/components/ui";
@@ -10,7 +11,10 @@ export const metadata = { title: "Pengaturan" };
 
 export default async function Page() {
   const [f, user] = await Promise.all([loadFacts(), currentUser()]);
-  const users = await q<{ id: number; name: string; role: string }>("select id, name, role from users where active order by id");
+  const emps = await listEmployees();
+  const users = await q<{ id: number; name: string; role: string; active: boolean; link: string }>(
+    `select u.id, u.name, u.role, u.active, coalesce(e.name, p.name, '') as link from users u
+       left join employees e on e.id = u.employee_id left join partners p on p.id = u.partner_id order by u.active desc, u.id`);
   const demo = (await q<{ n: number }>("select count(*)::int as n from transactions where source='demo'"))[0]?.n ?? 0;
   const owner = user?.role === "owner";
   const base = process.env.APP_URL || "https://<domain-hub-kamu>";
@@ -82,13 +86,28 @@ Content-Type: application/json
           <Field label="Warna"><input name="color" type="color" defaultValue="#b8c4ff" className="input !p-1" /></Field><button className="btn btn-primary">Tambah usaha</button></form>
       </div>
 
-      <h2 className="mb-3 mt-8 font-display text-lg font-semibold">Pengguna</h2>
+      <h2 className="mb-1 mt-8 font-display text-lg font-semibold">Akses & pengguna</h2>
+      <p className="mb-3 text-sm text-muted">Login memakai nama + PIN 6 digit. <b>Owner</b> bisa mengubah semua; <b>Partner</b> melihat semua; <b>Investor</b> hanya melihat kondisi terkini, modalnya sendiri, dan dokumen untuk investor; <b>Karyawan</b> hanya melihat slip gaji, pendapatan, dan dokumen miliknya.</p>
       <div className="grid gap-3 md:grid-cols-2">
-        <section className="card card-pad"><ul className="space-y-2 text-sm">{users.map((u) => <li key={u.id} className="flex justify-between"><span>{u.name}</span><Pill>{u.role}</Pill></li>)}</ul></section>
-        <form action={addUserAction} className="card card-pad grid gap-3"><h3 className="font-display font-semibold">Tambah pengguna (mis. partner, lihat saja)</h3>
-          <Field label="Nama"><input name="name" className="input" required /></Field><Field label="PIN 6 digit"><input name="pin" inputMode="numeric" maxLength={6} className="input" required /></Field>
-          <Field label="Peran"><select name="role" className="input"><option value="partner">Partner (lihat saja)</option><option value="owner">Owner (bisa ubah)</option></select></Field><button className="btn btn-primary">Tambah</button></form>
+        <section className="card card-pad"><ul className="divide-y divide-line text-sm">{users.map((u) => (
+          <li key={u.id} className="py-2.5"><div className="flex items-center justify-between gap-2"><span><b className="font-medium">{u.name}</b> <span className="text-xs text-muted">{u.link}</span></span><span className="flex items-center gap-2"><Pill tone={u.active ? "info" : "warn"}>{ROLE_LABEL[u.role as Role] ?? u.role}{u.active ? "" : " · nonaktif"}</Pill>
+            {u.id !== user?.id && <form action={toggleUser}><input type="hidden" name="id" value={u.id} /><button className="text-xs text-muted hover:text-fg">{u.active ? "Nonaktifkan" : "Aktifkan"}</button></form>}</span></div>
+            <form action={resetUserPin} className="mt-1.5 flex items-center gap-2"><input type="hidden" name="id" value={u.id} /><input name="pin" inputMode="numeric" maxLength={6} placeholder="PIN baru" className="input !min-h-8 !w-28 text-xs" required /><button className="btn !min-h-8 text-xs">Ganti PIN</button></form></li>))}</ul></section>
+        <form action={addUserAction} className="card card-pad grid gap-3"><h3 className="font-display font-semibold">Tambah akun</h3>
+          <Field label="Nama (dipakai untuk login)"><input name="name" className="input" required autoComplete="off" /></Field>
+          <Field label="PIN 6 digit"><input name="pin" inputMode="numeric" maxLength={6} className="input" required autoComplete="off" /></Field>
+          <Field label="Peran"><select name="role" className="input" defaultValue="karyawan"><option value="karyawan">Karyawan (slip gaji & dokumen sendiri)</option><option value="investor">Investor (kondisi, modal sendiri, dokumen)</option><option value="partner">Partner (lihat semua)</option><option value="owner">Owner (bisa ubah semua)</option></select></Field>
+          <Field label="Hubungkan ke karyawan (peran Karyawan)"><select name="employee" className="input" defaultValue=""><option value="">—</option>{emps.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</select></Field>
+          <Field label="Hubungkan ke partner/investor (peran Investor)"><select name="partner" className="input" defaultValue=""><option value="">—</option>{f.partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+          <button className="btn btn-primary">Buat akun</button></form>
       </div>
+
+      <h2 className="mb-1 mt-8 font-display text-lg font-semibold">Pasang di iPhone & Android</h2>
+      <section className="card card-pad grid gap-4 text-sm md:grid-cols-2">
+        <div><b className="font-medium">iPhone / iPad (Safari)</b><ol className="mt-2 list-decimal space-y-1 pl-5 text-muted"><li>Buka alamat Hub di <b className="text-fg">Safari</b>.</li><li>Ketuk tombol <b className="text-fg">Bagikan</b> (kotak dengan panah ke atas).</li><li>Pilih <b className="text-fg">Tambah ke Layar Utama</b>, lalu <b className="text-fg">Tambah</b>.</li></ol></div>
+        <div><b className="font-medium">Android (Chrome)</b><ol className="mt-2 list-decimal space-y-1 pl-5 text-muted"><li>Buka alamat Hub di <b className="text-fg">Chrome</b>.</li><li>Ketuk banner <b className="text-fg">Pasang</b>, atau menu ⋮ → <b className="text-fg">Instal aplikasi</b>.</li><li>Ikon Frameless muncul di layar utama dan membuka layar penuh.</li></ol></div>
+        <p className="text-xs text-muted md:col-span-2">Data keuangan tidak disimpan di HP; aplikasi selalu mengambil data terbaru saat online. Investor dan karyawan memasang dengan cara yang sama dan hanya melihat area mereka.</p>
+      </section>
 
       <h2 className="mb-3 mt-8 font-display text-lg font-semibold">Data contoh</h2>
       <section className="card card-pad flex flex-wrap items-center justify-between gap-3">

@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { q } from "./db";
 import { addMonths, thisMonth } from "./format";
 
@@ -42,7 +43,8 @@ export type Facts = {
   plans: Map<number, Record<string, number>>; now: string;
 };
 
-export async function loadFacts(): Promise<Facts> {
+/** Dicache per permintaan: layout + halaman + komponen memakai satu set query, bukan beberapa. */
+export const loadFacts = cache(async function loadFacts(): Promise<Facts> {
   const [companies, partners, cps, rows, targets, plans] = await Promise.all([
     q<Company>("select id, slug, name, kind, color, started_on, active, api_key_prefix, last_sync_at, share_capital_pct, share_work_pct, reserve_pct from companies where active order by sort, id"),
     q<Partner>("select id, name, role from partners where active order by id"),
@@ -59,7 +61,7 @@ export async function loadFacts(): Promise<Facts> {
     pm.set(p.company_id, o);
   }
   return { companies, partners, cps, rows, targets, plans: pm, now: thisMonth() };
-}
+});
 
 export const NON_CAPITAL = ["saldo_awal", "pinjaman"]; // setoran kas yang bukan modal partner
 type Pred = { company?: number | null; months?: string[]; kind?: string | string[]; category?: string; notCat?: string[]; funding?: string; partner?: number };

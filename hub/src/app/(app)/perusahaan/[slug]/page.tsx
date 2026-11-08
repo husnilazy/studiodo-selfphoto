@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { q } from "@/lib/db";
 import { currentUser } from "@/lib/auth";
@@ -7,10 +8,11 @@ import { CompanyDot, Empty, PageHead, Pill, Stat } from "@/components/ui";
 import { Donut, Legend, Progress, TrendChart } from "@/components/charts";
 import TxForm from "@/components/TxForm";
 import LiveRefresh from "@/components/LiveRefresh";
+import { allocate, getShared } from "@/lib/sharedcost";
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [f, user] = await Promise.all([loadFacts(), currentUser()]);
+  const [f, user, sharedCfg] = await Promise.all([loadFacts(), currentUser(), getShared()]);
   const c = f.companies.find((x) => x.slug === slug);
   if (!c) notFound();
   const months = lastMonths(6, f.now);
@@ -31,6 +33,18 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
         <Stat label="Biaya" value={rupiah(s.opex)} />
         <Stat label="Laba" value={rupiah(s.profit)} tone={s.profit < 0 ? "bad" : s.profit > 0 ? "ok" : undefined} sub={`Margin ${pct(s.margin)}`} />
       </div>
+
+      {(() => {
+        const a = allocate(f, sharedCfg, [f.now]);
+        const u = a.units.find((x) => x.company.id === c.id);
+        if (!u || a.pool === 0) return null;
+        return (
+          <p className="mt-3 rounded-xl border border-line px-4 py-3 text-sm text-muted">
+            Beban bersama bulan ini <b className="text-fg">{rupiah(a.pool)}</b> (dibayar {a.host?.name}). Porsi {c.name}: <b className="text-fg">{pct(u.pct)} = {rupiah(u.share)}</b>
+            {" → "}laba setelah alokasi <b className={s.profit + u.adjust < 0 ? "text-bad" : "text-fg"}>{rupiah(s.profit + u.adjust)}</b>. <Link href="/beban-bersama" className="text-accent underline">Atur porsi</Link>
+          </p>
+        );
+      })()}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-5">
         <section className="card card-pad lg:col-span-3">

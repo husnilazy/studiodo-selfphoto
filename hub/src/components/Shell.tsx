@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import Logo from "./Logo";
 import ThemeToggle from "./ThemeToggle";
+import InstallPrompt from "./InstallPrompt";
 
 type Co = { slug: string; name: string };
 type Tab = { href: string; label: string };
@@ -18,17 +19,17 @@ const fmt = (n: number) => {
 function groups(companies: Co[]): Group[] {
   return [
     { key: "home", label: "Ringkasan", href: "/", ic: "M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
-      match: (p) => p === "/" || p.startsWith("/perusahaan"),
-      tabs: [{ href: "/", label: "Seluruh grup" }, ...companies.map((c) => ({ href: `/perusahaan/${c.slug}`, label: c.name.replace("STUDIODO ", "SD ") }))] },
+      match: (p) => p === "/" || p.startsWith("/perusahaan") || p.startsWith("/kondisi"),
+      tabs: [{ href: "/", label: "Seluruh grup" }, { href: "/kondisi", label: "Kondisi" }, ...companies.map((c) => ({ href: `/perusahaan/${c.slug}`, label: c.name.replace("STUDIODO ", "SD ") }))] },
     { key: "keu", label: "Keuangan", href: "/transaksi", ic: "M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
-      match: (p) => ["/transaksi", "/modal", "/bagi-hasil", "/gaji", "/rekonsiliasi"].some((x) => p.startsWith(x)),
-      tabs: [{ href: "/transaksi", label: "Transaksi" }, { href: "/modal", label: "Modal" }, { href: "/bagi-hasil", label: "Bagi hasil" }, { href: "/gaji", label: "Gaji & tim" }, { href: "/rekonsiliasi", label: "Rekonsiliasi" }] },
+      match: (p) => ["/transaksi", "/modal", "/bagi-hasil", "/gaji", "/rekonsiliasi", "/kewajiban", "/beban-bersama"].some((x) => p.startsWith(x)),
+      tabs: [{ href: "/transaksi", label: "Transaksi" }, { href: "/modal", label: "Modal" }, { href: "/bagi-hasil", label: "Bagi hasil" }, { href: "/gaji", label: "Gaji & tim" }, { href: "/rekonsiliasi", label: "Rekonsiliasi" }, { href: "/kewajiban", label: "Hutang & piutang" }, { href: "/beban-bersama", label: "Beban bersama" }] },
     { key: "plan", label: "Perencanaan", href: "/alokasi", ic: "M3 3v18h18M7 14l4-4 4 3 5-7",
       match: (p) => ["/alokasi", "/target", "/proyeksi", "/rekomendasi"].some((x) => p.startsWith(x)),
       tabs: [{ href: "/alokasi", label: "Alokasi" }, { href: "/target", label: "Target" }, { href: "/proyeksi", label: "Proyeksi" }, { href: "/rekomendasi", label: "Rekomendasi" }] },
     { key: "inv", label: "Investor", href: "/pitching", ic: "M4 4h16v12H4zM8 20h8M12 16v4",
-      match: (p) => p.startsWith("/pitching") || p.startsWith("/ide"),
-      tabs: [{ href: "/pitching", label: "Materi pitching" }, { href: "/ide", label: "Ide & rencana" }] },
+      match: (p) => p.startsWith("/pitching") || p.startsWith("/ide") || p.startsWith("/dokumen"),
+      tabs: [{ href: "/pitching", label: "Materi pitching" }, { href: "/dokumen", label: "Dokumen" }, { href: "/ide", label: "Ide & rencana" }] },
     { key: "set", label: "Pengaturan", href: "/pengaturan", ic: "M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0", match: (p) => p.startsWith("/pengaturan"), tabs: [] },
   ];
 }
@@ -105,6 +106,7 @@ export default function Shell({ user, companies, cash, children }: { user: { nam
           </Link>
         ))}
       </nav>
+      <InstallPrompt />
     </div>
   );
 }

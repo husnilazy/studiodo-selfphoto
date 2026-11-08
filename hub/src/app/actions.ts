@@ -49,11 +49,13 @@ export async function setupAction(_: FormState, fd: FormData): Promise<FormState
 }
 
 export async function loginAction(_: FormState, fd: FormData): Promise<FormState> {
-  const id = Number(s(fd, "user")), pin = s(fd, "pin");
+  const name = s(fd, "name"), pin = s(fd, "pin");
+  if (!name) return { error: "Nama wajib diisi." };
   if (!/^\d{6}$/.test(pin)) return { error: "PIN harus 6 digit." };
+  // Nama diketik (bukan daftar pilihan) agar nama karyawan/investor tidak terlihat oleh orang lain.
   const u = await one<{ id: number; pin_hash: string; failed_attempts: number; locked_until: string | null }>(
-    "select id, pin_hash, failed_attempts, locked_until from users where id = $1 and active", [id]);
-  if (!u) return { error: "Pengguna tidak ditemukan." };
+    "select id, pin_hash, failed_attempts, locked_until from users where lower(name) = lower($1) and active", [name]);
+  if (!u) return { error: "Nama atau PIN salah." };
   if (u.locked_until && new Date(u.locked_until) > new Date()) return { error: "Terlalu banyak percobaan. Coba lagi beberapa menit lagi." };
   if (!verifyPin(pin, u.pin_hash)) {
     const f = u.failed_attempts + 1;
@@ -66,11 +68,32 @@ export async function loginAction(_: FormState, fd: FormData): Promise<FormState
   redirect("/");
 }
 
+const ROLES = ["owner", "partner", "investor", "karyawan"];
 export async function addUserAction(fd: FormData) {
   await requireOwner();
-  const name = s(fd, "name"), pin = s(fd, "pin"), role = s(fd, "role") === "owner" ? "owner" : "partner";
+  const name = s(fd, "name"), pin = s(fd, "pin"), role = ROLES.includes(s(fd, "role")) ? s(fd, "role") : "partner";
   if (!name || !/^\d{6}$/.test(pin)) throw new Error("Nama dan PIN 6 digit wajib diisi.");
-  await q("insert into users (name, pin_hash, role) values ($1,$2,$3)", [name, hashPin(pin), role]);
+  if ((await q("select 1 from users where lower(name) = lower($1)", [name])).length) throw new Error("Nama pengguna sudah dipakai.");
+  const emp = role === "karyawan" ? n(fd, "employee") || null : null;
+  const par = role === "investor" || role === "partner" ? n(fd, "partner") || null : null;
+  if (role === "karyawan" && !emp) throw new Error("Pilih karyawan yang terkait akun ini.");
+  if (role === "investor" && !par) throw new Error("Pilih partner/investor yang terkait akun ini.");
+  await q("insert into users (name, pin_hash, role, employee_id, partner_id) values ($1,$2,$3,$4,$5)", [name, hashPin(pin), role, emp, par]);
+  refresh();
+}
+export async function resetUserPin(fd: FormData) {
+  const me = await requireOwner();
+  const id = n(fd, "id"), pin = s(fd, "pin");
+  if (!/^\d{6}$/.test(pin)) throw new Error("PIN harus 6 digit.");
+  await q("update users set pin_hash = $2, failed_attempts = 0, locked_until = null where id = $1", [id, hashPin(pin)]);
+  void me;
+  refresh();
+}
+export async function toggleUser(fd: FormData) {
+  const me = await requireOwner();
+  const id = n(fd, "id");
+  if (id === me.id) throw new Error("Akun yang sedang dipakai tidak bisa dinonaktifkan.");
+  await q("update users set active = not active where id = $1", [id]);
   refresh();
 }
 
@@ -191,39 +214,6 @@ export async function saveNote(fd: FormData) {
   refresh();
 }
 export async function deleteNote(fd: FormData) { await requireOwner(); await q("delete from notes where id=$1", [n(fd, "id")]); refresh(); }
-
-/* ───────── Gaji & tim ───────── */
-export async function saveEmployee(fd: FormData) {
-  await requireOwner();
-  const name = s(fd, "name"), company = n(fd, "company");
-  if (!name || !company) throw new Error("Nama dan unit wajib diisi.");
-  const id = n(fd, "id");
-  if (id) await q("update employees set name=$2, role=$3, salary=$4, company_id=$5 where id=$1", [id, name, s(fd, "role"), Math.max(0, n(fd, "salary")), company]);
-  else await q("insert into employees (company_id,name,role,salary) values ($1,$2,$3,$4)", [company, name, s(fd, "role"), Math.max(0, n(fd, "salary"))]);
-  refresh();
-}
-export async function toggleEmployee(fd: FormData) {
-  await requireOwner();
-  await q("update employees set active = not active where id=$1", [n(fd, "id")]);
-  refresh();
-}
-/** Mencatat gaji sebulan sebagai biaya (idempoten: menjalankan ulang bulan yang sama hanya memperbarui). */
-export async function runPayroll(fd: FormData) {
-  await requireOwner();
-  const company = n(fd, "company"), month = s(fd, "month");
-  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error("Bulan tidak valid.");
-  const emps = await q<{ id: number; name: string; salary: number }>("select id, name, salary from employees where company_id=$1 and active and salary > 0", [company]);
-  const date = month === thisMonth() ? today() : `${month}-28`;
-  await tx(async (t) => {
-    for (const e of emps)
-      await t(
-        `insert into transactions (company_id,date,kind,category,amount,memo,source,external_id)
-         values ($1,$2,'expense','gaji',$3,$4,'payroll',$5)
-         on conflict (company_id, external_id) where external_id is not null do update set amount=excluded.amount, memo=excluded.memo`,
-        [company, date, e.salary, `Gaji ${e.name} ${month}`, `payroll:${month}:${e.id}`]);
-  });
-  refresh();
-}
 
 /* ───────── Tarik langsung dari database unit ───────── */
 export async function pullNow(_: FormState, fd: FormData): Promise<FormState> {
