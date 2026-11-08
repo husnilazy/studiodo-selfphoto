@@ -68,6 +68,12 @@ export async function clarity(f: Facts) {
     href: "/gaji",
   });
 
+  // 9. Inventaris aset: pembelian aset di buku harus punya padanan di daftar barang + kondisinya
+  const [inv] = await q<{ n: number; broken: number; linked: number }>("select count(*)::int as n, count(*) filter (where status in ('rusak','hilang'))::int as broken, coalesce(sum(cost) filter (where tx_id is not null),0)::bigint as linked from assets");
+  const ledgerAssets = sum(f.rows, { kind: "asset_purchase" });
+  const covered = ledgerAssets === 0 || Number(inv.linked) >= ledgerAssets * 0.9;
+  out.push({ ok: covered, level: "warn", title: "Inventaris aset", detail: covered ? `${inv.n} barang tercatat, ${inv.broken} rusak/hilang sudah ditandai.` : `Pembelian aset di buku Rp ${compact(ledgerAssets)}, baru Rp ${compact(Number(inv.linked))} masuk inventaris. Salin lalu tandai barang rusak/hilang agar nilai aset jujur.`, href: "/aset" });
+
   const passed = out.filter((c) => c.ok).length;
   return { checks: out, score: out.length ? Math.round((passed / out.length) * 100) : 100, passed, total: out.length };
 }

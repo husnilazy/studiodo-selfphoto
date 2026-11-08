@@ -32,7 +32,11 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     <>
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2">
         <Link href={isTeam(user) ? `/gaji/${sl.employee_id}` : "/saya"} className="btn !min-h-9 text-xs">← Kembali</Link>
-        <PrintButton />
+        <span className="flex flex-wrap items-center gap-2">
+          <a href={`/api/pdf/slip/${sl.id}`} target="_blank" rel="noreferrer" className="btn">Lihat PDF</a>
+          <a href={`/api/pdf/slip/${sl.id}?dl=1`} download className="btn btn-primary">Unduh PDF</a>
+          <PrintButton label="Cetak" />
+        </span>
       </div>
       {/* Kertas: selalu putih agar jelas saat dicetak, apa pun tema aplikasi */}
       <article className="mx-auto max-w-2xl rounded-2xl bg-white p-8 text-[13px] leading-relaxed text-neutral-900 shadow-xl print:rounded-none print:shadow-none md:p-10">

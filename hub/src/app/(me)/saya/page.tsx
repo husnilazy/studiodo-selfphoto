@@ -2,10 +2,11 @@ import Link from "next/link";
 import { isTeam, requireUser, ROLE_LABEL } from "@/lib/auth";
 import { q } from "@/lib/db";
 import { capitalByPartner, loadFacts, profitShare } from "@/lib/metrics";
-import { EMP_COLS, ITEM_KIND, PAY_TYPE_LABEL, type Emp } from "@/lib/payroll";
-import { addMonths, fullMonth, pct, rupiah } from "@/lib/format";
+import { EMP_COLS, ITEM_KIND, PAY_TYPE_LABEL, computeSlip, weeksIn, type Emp } from "@/lib/payroll";
+import { addMonths, fullMonth, monthLabel, pct, rupiah, thisMonth } from "@/lib/format";
 import { Empty, Pill, SectionHead, Stat } from "@/components/ui";
 import PitchBody from "@/components/PitchBody";
+import { TrendChart } from "@/components/charts";
 
 export const metadata = { title: "Area saya" };
 type Doc = { id: number; title: string; kind: string; url: string; body: string; created_at: string };
@@ -40,6 +41,13 @@ export default async function Page() {
       q<{ id: number; date: string; kind: string; amount: number; project: string; payslip_id: number | null }>("select id, to_char(date,'YYYY-MM-DD') as date, kind, amount::bigint as amount, project, payslip_id from pay_items where employee_id = $1 order by date desc limit 20", [emp.id]),
     ]) : [[], []];
     const total = slips.filter((s) => s.status === "dibayar").reduce((a, s) => a + Number(s.net), 0);
+    // Preview pendapatan bulan berjalan: gaji pokok + bonus/fee yang belum masuk slip (belum final sampai slip diterbitkan)
+    const nowM = thisMonth();
+    const pending = emp ? await q<{ kind: string; amount: number; project: string; date: string }>("select kind, amount::bigint as amount, project, to_char(date,'YYYY-MM-DD') as date from pay_items where employee_id = $1 and payslip_id is null and to_char(date,'YYYY-MM') = $2 order by date", [emp.id, nowM]) : [];
+    const est = emp ? computeSlip(emp, weeksIn(nowM), pending) : null;
+    const hasSlipNow = slips.some((s) => s.period === nowM);
+    const months = Array.from({ length: 6 }, (_, i) => addMonths(nowM, i - 5));
+    const trend = months.map((m) => slips.filter((s) => s.period === m).reduce((a, s) => a + Number(s.net), 0));
     return (
       <>
         <h1 className="font-display text-2xl">Halo, {user.name}</h1>
@@ -48,13 +56,25 @@ export default async function Page() {
           <Stat label="Total diterima (slip dibayar)" value={rupiah(total)} />
           <Stat label="Slip gaji" value={String(slips.length)} />
         </div>
+        {est && (
+          <section className="card card-pad mt-4">
+            <SectionHead title={`Preview pendapatan ${fullMonth(nowM)}`} note={hasSlipNow ? "Slip bulan ini sudah terbit, lihat di bawah." : "Perkiraan, belum final sampai slip diterbitkan Owner."} />
+            <div className="stat-value text-3xl">{rupiah(hasSlipNow ? Number(slips.find((x) => x.period === nowM)!.net) : est.net)}</div>
+            {!hasSlipNow && <ul className="mt-3 divide-y divide-line text-sm">
+              {est.base > 0 && <li className="flex justify-between py-2"><span className="text-muted">{emp!.pay_type === "weekly" ? `Gaji pokok (${weeksIn(nowM)} minggu)` : "Gaji pokok"}</span><span className="tnum">{rupiah(est.base)}</span></li>}
+              {pending.map((i, k) => <li key={k} className="flex justify-between py-2"><span className="text-muted">{ITEM_KIND[i.kind]?.label ?? i.kind}{i.project && ` · ${i.project}`} <span className="text-xs">{i.date}</span></span><span className={`tnum ${ITEM_KIND[i.kind]?.sign === -1 ? "text-bad" : ""}`}>{ITEM_KIND[i.kind]?.sign === -1 ? "−" : "+"}{rupiah(Number(i.amount))}</span></li>)}
+              {est.base === 0 && pending.length === 0 && <li className="py-2 text-muted">Belum ada pendapatan tercatat bulan ini.</li>}
+            </ul>}
+            {trend.some((v) => v > 0) && <div className="mt-4"><div className="mb-1 text-xs text-muted">Diterima 6 bulan terakhir (slip)</div><TrendChart labels={months.map(monthLabel)} height={150} series={[{ name: "Diterima", color: "#5fd1c4", values: trend }]} /></div>}
+          </section>
+        )}
         <section className="card card-pad mt-4">
           <SectionHead title="Slip gaji saya" />
           {slips.length === 0 ? <p className="text-sm text-muted">Belum ada slip.</p> : (
             <ul className="divide-y divide-line text-sm">{slips.map((s) => (
               <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
                 <span><b className="font-medium">{fullMonth(s.period)}</b> <span className="tnum text-muted">· {rupiah(Number(s.net))}</span></span>
-                <span className="flex items-center gap-2"><Pill tone={s.status === "dibayar" ? "ok" : "info"}>{s.status === "dibayar" ? "Dibayar" : "Diproses"}</Pill><Link href={`/slip/${s.id}`} className="btn !min-h-8 text-xs">Lihat slip</Link></span>
+                <span className="flex items-center gap-2"><Pill tone={s.status === "dibayar" ? "ok" : "info"}>{s.status === "dibayar" ? "Dibayar" : "Diproses"}</Pill><Link href={`/slip/${s.id}`} className="btn !min-h-8 text-xs">Lihat</Link><a href={`/api/pdf/slip/${s.id}?dl=1`} download className="btn btn-primary !min-h-8 text-xs">PDF</a></span>
               </li>))}</ul>
           )}
         </section>

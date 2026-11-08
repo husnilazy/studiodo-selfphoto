@@ -1,5 +1,5 @@
 // Skema Frameless Hub. Idempotent; naikkan SCHEMA_VERSION setiap ada perubahan.
-export const SCHEMA_VERSION = "4";
+export const SCHEMA_VERSION = "5";
 
 export const SCHEMA = `
 create table if not exists users (
@@ -106,4 +106,16 @@ create table if not exists obligations (
   amount bigint not null check (amount >= 0), paid bigint not null default 0, due date,
   note text not null default '', created_at timestamptz not null default now()
 );
+
+-- v5: inventaris aset. status: aktif | perbaikan | rusak | dijual | hilang. tx_id = pembelian di buku besar (bila ada).
+create table if not exists assets (
+  id serial primary key, company_id int not null references companies(id) on delete cascade,
+  name text not null, category text not null default 'alat', qty int not null default 1 check (qty >= 1),
+  acquired_on date, cost bigint not null default 0 check (cost >= 0), life_years int not null default 4 check (life_years >= 1),
+  status text not null default 'aktif', est_value bigint, location text not null default '', holder text not null default '',
+  serial text not null default '', note text not null default '', tx_id bigint, status_on date, sale_price bigint,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists assets_tx_u on assets (tx_id) where tx_id is not null;
+create index if not exists assets_co on assets (company_id, status);
 `;

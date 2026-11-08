@@ -47,7 +47,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                 <span><b className="font-medium">{fullMonth(s.period)}</b> <span className="tnum text-muted">· bersih {rupiah(Number(s.net))}</span></span>
                 <span className="flex flex-wrap items-center gap-2">
                   <Pill tone={s.status === "dibayar" ? "ok" : "info"}>{s.status === "dibayar" ? `Dibayar ${s.paid_on}` : "Draft"}</Pill>
-                  <Link href={`/slip/${s.id}`} className="btn !min-h-8 text-xs">Lihat / cetak</Link>
+                  <Link href={`/slip/${s.id}`} className="btn !min-h-8 text-xs">Lihat</Link> <a href={`/api/pdf/slip/${s.id}?dl=1`} download className="btn btn-primary !min-h-8 text-xs">PDF</a>
                   {owner && s.status !== "dibayar" && (
                     <form action={markPayslipPaid} className="flex items-center gap-1"><input type="hidden" name="id" value={s.id} /><input type="date" name="date" defaultValue={today()} className="input !min-h-8 !w-36 text-xs" /><button className="btn btn-primary !min-h-8 text-xs">Tandai dibayar</button></form>
                   )}
