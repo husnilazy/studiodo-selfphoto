@@ -7,3 +7,7 @@ node_modules
 next-env.d.ts
 .claude/
 .data-dev.log
+
+.vercel
+
+.vercel
