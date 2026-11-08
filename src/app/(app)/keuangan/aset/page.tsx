@@ -14,6 +14,7 @@ export const metadata = { title: "Aset Tetap" };
 export default async function AssetsPage() {
   await requireUser(["owner"]);
   const today = todayWIB();
+  const prevMonth = (() => { const [y, m] = today.slice(0, 7).split("-").map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`; })();
   const [assets, assetAccs, cash] = await Promise.all([
     q<{ id: number; name: string; acquired_on: string; cost: number; salvage: number; life_months: number; account: string; accum: number; months: number }>(
       `select f.id, f.name, f.acquired_on, f.cost, f.salvage, f.life_months, a.name as account,
@@ -33,7 +34,8 @@ export default async function AssetsPage() {
         actions={<>
           <Sheet title="Catat Penyusutan" trigger={<button className="btn"><Icon name="clock" className="size-4" /> Susutkan Bulan</button>}>
             <ActionForm action={runDepreciation} submit="Catat Penyusutan">
-              <Field label="Periode (bulan)" hint="Semua aset yang belum disusutkan di bulan itu akan dicatat sekaligus."><input type="month" name="period" className="input" defaultValue={today.slice(0, 7)} required /></Field>
+              <Field label="Sampai periode (bulan)" hint="Disarankan bulan lalu: bulan berjalan baru disusutkan di akhir bulan."><input type="month" name="period" className="input" defaultValue={prevMonth} required /></Field>
+              <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="catchup" defaultChecked className="mt-1 size-4" /><span>Kejar ketinggalan: susutkan juga semua bulan sebelumnya yang belum tercatat (sejak aset tertua). Bulan yang sudah ada dilewati.</span></label>
             </ActionForm>
           </Sheet>
           <Sheet title="Impor Aset (CSV)" wide trigger={<button className="btn"><Icon name="folder" className="size-4" /> Impor CSV</button>}>

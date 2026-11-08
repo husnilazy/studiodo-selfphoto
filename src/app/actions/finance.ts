@@ -241,37 +241,61 @@ export async function importAssets(_p: ActionState, fd: FormData) {
   });
 }
 
-/** Mencatat penyusutan garis lurus untuk satu bulan (semua aset yang belum disusutkan di bulan itu). */
+/** Menyusutkan satu bulan: semua aset yang belum disusutkan di bulan itu, satu jurnal per bulan. Mengembalikan total yang dicatat. */
+async function depreciateMonth(q: typeof rootQ, userId: number, period: string): Promise<number> {
+  const end = monthEnd(`${period}-01`);
+  const assets = await q<{ id: number; name: string; cost: number; salvage: number; life_months: number; acquired_on: string }>(
+    "select id, name, cost, salvage, life_months, acquired_on from fixed_assets where disposed_on is null and acquired_on <= $1", [end]);
+  let sum = 0;
+  const rows: { id: number; amt: number }[] = [];
+  for (const a of assets) {
+    const [done] = await q<{ n: number; s: number; has: number }>(
+      "select count(*)::int as n, coalesce(sum(amount),0) as s, count(*) filter (where period = $2)::int as has from asset_depreciation where asset_id = $1", [a.id, period]);
+    if (done.has > 0 || done.n >= a.life_months) continue;
+    const base = Math.floor((a.cost - a.salvage) / a.life_months);
+    const amt = done.n === a.life_months - 1 ? a.cost - a.salvage - done.s : base; // bulan terakhir menutup sisa pembulatan
+    if (amt > 0) { rows.push({ id: a.id, amt }); sum += amt; }
+  }
+  if (sum === 0) return 0;
+  const jid = await postJournal(q, {
+    date: end, memo: `Penyusutan ${fmtMonth(`${period}-01`)}`, refType: "depreciation", userId,
+    lines: [{ account: "5190", debit: sum }, { account: "1590", credit: sum }],
+  });
+  for (const r of rows) await q("insert into asset_depreciation (asset_id, period, amount, journal_id) values ($1,$2,$3,$4)", [r.id, period, r.amt, jid]);
+  return sum;
+}
+
+const nextMonth = (p: string) => {
+  const [y, m] = p.split("-").map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+};
+
+/**
+ * Mencatat penyusutan garis lurus. Tanpa `catchup`: hanya satu bulan. Dengan `catchup`: semua bulan sejak aset tertua
+ * sampai periode itu yang belum tercatat (aman diulang, bulan yang sudah ada dilewati).
+ */
 export async function runDepreciation(_p: ActionState, fd: FormData) {
   return safe(async () => {
     const user = await actionUser(["owner"]);
     const period = str(fd, "period") || todayWIB().slice(0, 7);
     if (!/^\d{4}-\d{2}$/.test(period)) throw new Error("Periode tidak valid.");
-    const end = monthEnd(`${period}-01`);
-    const total = await tx(async (q) => {
-      const assets = await q<{ id: number; name: string; cost: number; salvage: number; life_months: number; acquired_on: string }>(
-        "select id, name, cost, salvage, life_months, acquired_on from fixed_assets where disposed_on is null and acquired_on <= $1", [end]);
-      let sum = 0;
-      const rows: { id: number; amt: number }[] = [];
-      for (const a of assets) {
-        const [done] = await q<{ n: number; s: number; has: number }>(
-          "select count(*)::int as n, coalesce(sum(amount),0) as s, count(*) filter (where period = $2)::int as has from asset_depreciation where asset_id = $1", [a.id, period]);
-        if (done.has > 0 || done.n >= a.life_months) continue;
-        const base = Math.floor((a.cost - a.salvage) / a.life_months);
-        const amt = done.n === a.life_months - 1 ? a.cost - a.salvage - done.s : base; // bulan terakhir menutup sisa pembulatan
-        if (amt > 0) { rows.push({ id: a.id, amt }); sum += amt; }
+    const catchup = fd.get("catchup") === "on";
+    const result = await tx(async (q) => {
+      let first = period;
+      if (catchup) {
+        const [m] = await q<{ first: string | null }>("select to_char(min(acquired_on), 'YYYY-MM') as first from fixed_assets where disposed_on is null");
+        if (m?.first && m.first < period) first = m.first;
       }
-      if (sum === 0) return 0;
-      const jid = await postJournal(q, {
-        date: end, memo: `Penyusutan ${fmtMonth(`${period}-01`)}`, refType: "depreciation", userId: user.id,
-        lines: [{ account: "5190", debit: sum }, { account: "1590", credit: sum }],
-      });
-      for (const r of rows) await q("insert into asset_depreciation (asset_id, period, amount, journal_id) values ($1,$2,$3,$4)", [r.id, period, r.amt, jid]);
-      return sum;
+      let total = 0, months = 0;
+      for (let p = first; p <= period; p = nextMonth(p)) {
+        const sum = await depreciateMonth(q, user.id, p);
+        if (sum > 0) { total += sum; months++; }
+      }
+      return { total, months };
     });
-    if (total === 0) throw new Error("Tidak ada aset yang perlu disusutkan untuk periode itu (sudah dicatat atau belum ada aset).");
+    if (result.total === 0) throw new Error("Tidak ada aset yang perlu disusutkan untuk periode itu (sudah dicatat atau belum ada aset).");
     refresh();
-    return { ok: true, message: `Penyusutan ${rupiah(total)} dicatat.` };
+    return { ok: true, message: result.months > 1 ? `Penyusutan ${result.months} bulan (${rupiah(result.total)}) dicatat.` : `Penyusutan ${rupiah(result.total)} dicatat.` };
   });
 }
 
