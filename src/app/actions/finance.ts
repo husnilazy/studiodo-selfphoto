@@ -16,7 +16,7 @@ const validDate = (d: string) => {
 
 /** Kode akun dari id (untuk jurnal). */
 async function codeOf(q: typeof rootQ, id: number, types?: string[]) {
-  const [a] = await q<{ code: string; type: string; subtype: string; active: boolean }>("select code, type, subtype, active from accounts where id = $1", [id]);
+  const [a] = await q<{ code: string; name: string; type: string; subtype: string; active: boolean }>("select code, name, type, subtype, active from accounts where id = $1", [id]);
   if (!a || !a.active) throw new Error("Akun tidak ditemukan atau nonaktif.");
   if (types && !types.includes(a.type)) throw new Error("Jenis akun tidak sesuai.");
   return a;
@@ -118,7 +118,10 @@ export async function manualJournal(_p: ActionState, fd: FormData) {
         const a = await codeOf(q, accs[i]);
         lines.push({ account: a.code, debit: deb[i], credit: cred[i] });
       }
-      await postJournal(q, { date, memo, refType: "manual", userId: user.id, lines });
+      const jid = await postJournal(q, { date, memo, refType: "manual", userId: user.id, lines });
+      // Jurnal manual yang menyentuh Kas (1101) hari ini harus ikut tercatat di shift, supaya "seharusnya di laci" tetap benar.
+      const drawer = lines.reduce((t, l) => (l.account === "1101" ? t + l.debit - l.credit : t), 0);
+      if (date === todayWIB()) await linkCashMove(q, { delta: drawer, note: memo, userId: user.id, journalId: jid });
     });
     refresh();
   });
@@ -130,7 +133,7 @@ export async function voidManualJournal(id: number, _p: ActionState, _fd: FormDa
     await tx(async (q) => {
       const [j] = await q<{ ref_type: string }>("select ref_type from journals where id = $1", [id]);
       if (!j) throw new Error("Jurnal tidak ditemukan.");
-      if (!["manual", "cash", "depreciation"].includes(j.ref_type)) throw new Error("Jurnal ini dibuat otomatis dari transaksi lain. Batalkan lewat transaksi asalnya.");
+      if (!["manual", "cash", "depreciation", "adjustment"].includes(j.ref_type)) throw new Error("Jurnal ini dibuat otomatis dari transaksi lain. Batalkan lewat transaksi asalnya.");
       if (j.ref_type === "depreciation") await q("delete from asset_depreciation where journal_id = $1", [id]);
       await voidJournal(q, id);
       await q("update shift_moves set voided = true where journal_id = $1", [id]);
@@ -187,6 +190,8 @@ async function insertAsset(q: typeof rootQ, userId: number, d: NewAsset) {
     lines: [{ account: asset.code, debit: d.cost }, { account: credit.code, credit: d.cost }],
   });
   await q("update fixed_assets set purchase_journal_id = $1 where id = $2", [jid, a.id]);
+  // Beli aset tunai hari ini = uang keluar laci.
+  if (credit.code === "1101" && d.date === todayWIB()) await linkCashMove(q, { delta: -d.cost, note: `Pembelian aset: ${d.name}`, userId, journalId: jid });
 }
 
 export async function addAsset(_p: ActionState, fd: FormData) {
@@ -299,3 +304,72 @@ export async function runDepreciation(_p: ActionState, fd: FormData) {
   });
 }
 
+
+
+/* ───────── Penyesuaian saldo & pencairan QRIS ───────── */
+const ADJ_LABEL: Record<string, string> = { opening: "saldo awal / sebelum aplikasi dipakai", selisih: "selisih tidak diketahui", admin: "biaya admin bank/QRIS", transfer: "pindah antar kas/bank" };
+
+/** Menyamakan saldo satu akun kas/bank di buku dengan saldo sebenarnya (uang fisik / mutasi bank / saldo e-wallet). */
+export async function adjustBalance(_p: ActionState, fd: FormData) {
+  return safe(async () => {
+    const user = await actionUser(["owner"]);
+    const date = validDate(str(fd, "date"));
+    const actual = int(fd, "actual");
+    if (actual < 0) throw new Error("Saldo sebenarnya tidak boleh negatif.");
+    const reason = str(fd, "reason");
+    if (!ADJ_LABEL[reason]) throw new Error("Pilih penyebab selisih.");
+    const msg = await tx(async (q) => {
+      const acc = await codeOf(q, int(fd, "account_id"));
+      if (acc.subtype !== "cash") throw new Error("Pilih akun kas/bank.");
+      const [b] = await q<{ b: number }>(
+        `select coalesce(sum(l.debit - l.credit),0) as b from journal_lines l join journals j on j.id = l.journal_id
+          join accounts a on a.id = l.account_id where a.code = $1 and not j.voided`, [acc.code]);
+      const book = Number(b.b), diff = actual - book;
+      if (diff === 0) throw new Error("Saldo di buku sudah sama dengan saldo sebenarnya. Tidak ada yang perlu disesuaikan.");
+      const abs = Math.abs(diff);
+      let lines: { account: string; debit?: number; credit?: number }[];
+      if (reason === "opening") lines = diff > 0 ? [{ account: acc.code, debit: abs }, { account: "3101", credit: abs }] : [{ account: "3201", debit: abs }, { account: acc.code, credit: abs }];
+      else if (reason === "selisih") lines = diff > 0 ? [{ account: acc.code, debit: abs }, { account: "4105", credit: abs }] : [{ account: "5109", debit: abs }, { account: acc.code, credit: abs }];
+      else if (reason === "admin") {
+        if (diff > 0) throw new Error("Biaya admin hanya untuk saldo yang lebih kecil dari buku.");
+        lines = [{ account: "5107", debit: abs }, { account: acc.code, credit: abs }];
+      } else {
+        const other = await codeOf(q, int(fd, "other_id"));
+        if (other.subtype !== "cash" || other.code === acc.code) throw new Error("Pilih akun kas/bank lain sebagai pasangan pindah dana.");
+        lines = diff > 0 ? [{ account: acc.code, debit: abs }, { account: other.code, credit: abs }] : [{ account: other.code, debit: abs }, { account: acc.code, credit: abs }];
+      }
+      const note = str(fd, "note");
+      const memo = `Penyesuaian saldo ${acc.name} ke ${rupiah(actual)} (${diff > 0 ? "+" : "−"}${rupiah(abs)}, ${ADJ_LABEL[reason]})${note ? ` – ${note}` : ""}`;
+      const jid = await postJournal(q, { date, memo, refType: "adjustment", userId: user.id, lines });
+      const drawer = lines.reduce((t, l) => (l.account === "1101" ? t + (l.debit ?? 0) - (l.credit ?? 0) : t), 0);
+      if (date === todayWIB()) await linkCashMove(q, { delta: drawer, note: memo, userId: user.id, journalId: jid });
+      return `Saldo disesuaikan: selisih ${diff > 0 ? "+" : "−"}${rupiah(abs)} dicatat sebagai ${ADJ_LABEL[reason]}.`;
+    });
+    refresh();
+    return { ok: true, message: msg };
+  });
+}
+
+/** Pencairan QRIS/e-wallet ke rekening bank: saldo QRIS berkurang, bank bertambah (bersih), potongan MDR jadi biaya. */
+export async function settleQris(_p: ActionState, fd: FormData) {
+  return safe(async () => {
+    const user = await actionUser(["owner"]);
+    const date = validDate(str(fd, "date"));
+    const gross = int(fd, "gross"), fee = Math.max(0, int(fd, "fee"));
+    if (gross <= 0) throw new Error("Nominal pencairan harus lebih dari 0.");
+    if (fee >= gross) throw new Error("Potongan tidak boleh sama atau lebih besar dari nominal.");
+    await tx(async (q) => {
+      const from = await codeOf(q, int(fd, "from_id")), to = await codeOf(q, int(fd, "to_id"));
+      if (from.subtype !== "cash" || to.subtype !== "cash" || from.code === to.code) throw new Error("Pilih dua akun kas/bank yang berbeda.");
+      const note = str(fd, "note");
+      const jid = await postJournal(q, {
+        date, memo: `Pencairan ${from.name} ke ${to.name}${fee ? ` (potongan ${rupiah(fee)})` : ""}${note ? ` – ${note}` : ""}`, refType: "adjustment", userId: user.id,
+        lines: [{ account: to.code, debit: gross - fee }, ...(fee > 0 ? [{ account: "5107", debit: fee }] : []), { account: from.code, credit: gross }],
+      });
+      const drawer = (to.code === "1101" ? gross - fee : 0) - (from.code === "1101" ? gross : 0);
+      if (date === todayWIB()) await linkCashMove(q, { delta: drawer, note: "Pencairan dana", userId: user.id, journalId: jid });
+    });
+    refresh();
+    return { ok: true, message: "Pencairan dicatat." };
+  });
+}

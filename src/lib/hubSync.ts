@@ -54,10 +54,15 @@ export async function syncToHub(days = 45) {
      from fixed_assets f join accounts pf on pf.id = f.paid_from_account_id
      where f.acquired_on >= ${SINCE} and f.note not ilike '%sudah di hub%'`, [d]); // catatan "sudah di Hub" = modal yang dicatat manual di Hub (hindari dobel)
   // Setoran modal (3101), prive (3201), dan pendapatan lain-lain (4105) yang dicatat manual lewat Keuangan → Modal/Prive/Transfer.
-  const cash = await q<{ id: number; d: string; code: string; net: number; memo: string }>(
-    `select j.id, to_char(j.date, 'YYYY-MM-DD') as d, a.code, (jl.credit - jl.debit)::bigint as net, j.memo
+  // Penyesuaian saldo (ref_type 'adjustment'): saldo awal masuk sebagai kas awal (bukan modal partner), selisih sebagai pendapatan/biaya lain.
+  const cash = await q<{ id: number; d: string; code: string; net: number; memo: string; ref_type: string }>(
+    `select j.id, to_char(j.date, 'YYYY-MM-DD') as d, a.code, (jl.credit - jl.debit)::bigint as net, j.memo, j.ref_type
      from journals j join journal_lines jl on jl.journal_id = j.id join accounts a on a.id = jl.account_id
-     where not j.voided and j.ref_type = 'cash' and a.code in ('3101', '3201', '4105') and j.date >= ${SINCE}`, [d]);
+     where not j.voided and j.ref_type in ('cash', 'adjustment') and a.code in ('3101', '3201', '4105') and j.date >= ${SINCE}`, [d]);
+  const adjExp = await q<{ id: number; d: string; name: string; amt: number }>(
+    `select j.id, to_char(j.date, 'YYYY-MM-DD') as d, a.name, (jl.debit - jl.credit)::bigint as amt
+     from journals j join journal_lines jl on jl.journal_id = j.id join accounts a on a.id = jl.account_id
+     where not j.voided and j.ref_type = 'adjustment' and a.type = 'expense' and j.date >= ${SINCE} and jl.debit > jl.credit`, [d]);
 
   const events: Ev[] = [];
   for (const r of rev) if (r.net > 0) events.push({ id: `rev:${r.d}`, date: r.d, kind: "revenue", category: "penjualan", amount: r.net, memo: "Pendapatan harian STUDIODO" });
@@ -72,10 +77,13 @@ export async function syncToHub(days = 45) {
   for (const a of assets) events.push({ id: `asset:${a.id}`, date: a.d, kind: "asset_purchase", category: "alat", amount: a.cost, memo: a.name, ...(a.by_owner ? { funding: "partner" as const, ...owner } : {}) });
   for (const c of cash) {
     const memo = (c.memo || "").slice(0, 120);
-    if (c.code === "3101" && c.net > 0) events.push({ id: `jr:${c.id}`, date: c.d, kind: "capital_in", category: "modal", amount: c.net, memo, ...owner });
+    if (c.code === "3101" && c.net > 0) events.push(c.ref_type === "adjustment"
+      ? { id: `jr:${c.id}`, date: c.d, kind: "capital_in", category: "saldo_awal", amount: c.net, memo }
+      : { id: `jr:${c.id}`, date: c.d, kind: "capital_in", category: "modal", amount: c.net, memo, ...owner });
     else if (c.code === "3201" && c.net < 0) events.push({ id: `jr:${c.id}`, date: c.d, kind: "withdrawal", category: "prive", amount: -c.net, memo, ...owner });
     else if (c.code === "4105" && c.net > 0) events.push({ id: `jr:${c.id}`, date: c.d, kind: "revenue", category: "lainnya", amount: c.net, memo });
   }
+  for (const a of adjExp) events.push({ id: `adj:${a.id}`, date: a.d, kind: "expense", category: catOf(a.name), amount: a.amt, memo: `Penyesuaian: ${a.name}` });
 
   const to = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
   const from = new Date(Date.now() + 7 * 3600e3 - d * 86400e3).toISOString().slice(0, 10);

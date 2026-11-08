@@ -7,6 +7,7 @@ const TABS = [
   { href: "/keuangan/pengeluaran", label: "Pengeluaran", match: (p: string) => p.startsWith("/keuangan/pengeluaran"), roles: ["owner", "admin"] },
   { href: "/keuangan/laporan", label: "Laporan", match: (p: string) => p.startsWith("/keuangan/laporan"), roles: ["owner"] },
   { href: "/keuangan/jurnal", label: "Jurnal", match: (p: string) => p.startsWith("/keuangan/jurnal"), roles: ["owner"] },
+  { href: "/keuangan/cocokkan", label: "Cocokkan Saldo", match: (p: string) => p.startsWith("/keuangan/cocokkan"), roles: ["owner"] },
   { href: "/keuangan/aset", label: "Aset Tetap", match: (p: string) => p.startsWith("/keuangan/aset"), roles: ["owner"] },
   { href: "/keuangan/akun", label: "Bagan Akun", match: (p: string) => p.startsWith("/keuangan/akun"), roles: ["owner"] },
 ];

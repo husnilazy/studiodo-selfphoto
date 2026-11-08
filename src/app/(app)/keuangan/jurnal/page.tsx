@@ -12,7 +12,7 @@ export const metadata = { title: "Jurnal" };
 
 type J = { id: number; date: string; memo: string; ref_type: string; voided: boolean };
 type L = { journal_id: number; code: string; name: string; debit: number; credit: number };
-const REF: Record<string, string> = { payment: "Pembayaran", expense: "Pengeluaran", cash: "Kas", manual: "Manual", asset: "Aset", depreciation: "Penyusutan" };
+const REF: Record<string, string> = { payment: "Pembayaran", expense: "Pengeluaran", cash: "Kas", manual: "Manual", asset: "Aset", depreciation: "Penyusutan", adjustment: "Penyesuaian" };
 
 export default async function JournalPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string; v?: string }> }) {
   await requireUser(["owner"]);
@@ -48,7 +48,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
                 <Badge tone={j.ref_type === "manual" ? "indigo" : "slate"}>{REF[j.ref_type] ?? j.ref_type}</Badge>
                 {j.voided && <Badge tone="red">Dibatalkan</Badge>}
                 <span className="min-w-0 flex-1 basis-40 truncate text-sm font-semibold">{j.memo}</span>
-                {!j.voided && ["manual", "cash", "depreciation"].includes(j.ref_type) && (
+                {!j.voided && ["manual", "cash", "depreciation", "adjustment"].includes(j.ref_type) && (
                   <ActionButton action={voidManualJournal.bind(null, j.id)} confirm="Batalkan jurnal ini?" className="btn btn-sm btn-danger">Batalkan</ActionButton>
                 )}
               </header>
