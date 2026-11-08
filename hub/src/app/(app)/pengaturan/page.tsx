@@ -2,7 +2,8 @@ import { q } from "@/lib/db";
 import { currentUser } from "@/lib/auth";
 import { loadFacts } from "@/lib/metrics";
 import { addCompany, addPartner, addUserAction, clearDemo, loadDemo, savePartnerLink } from "@/app/actions";
-import { ApiKeyButton } from "@/components/clientForms";
+import { ApiKeyButton, PullButton } from "@/components/clientForms";
+import { configured, SOURCES } from "@/lib/pull";
 import { CompanyDot, Field, PageHead, Pill } from "@/components/ui";
 
 export const metadata = { title: "Pengaturan" };
@@ -26,6 +27,12 @@ export default async function Page() {
               <Pill tone={c.last_sync_at ? "ok" : "info"}>{c.last_sync_at ? `Sinkron ${new Date(c.last_sync_at).toLocaleString("id-ID")}` : "Belum tersambung"}</Pill></div>
             <p className="mb-3 text-xs text-muted">Key: {c.api_key_prefix ? `${c.api_key_prefix}…` : "belum dibuat"}</p>
             <ApiKeyButton id={c.id} has={!!c.api_key_prefix} />
+            {configured(c.slug) && (
+              <div className="mt-3 border-t border-line pt-3">
+                <p className="mb-2 text-xs text-muted">Tarikan langsung dari {SOURCES[c.slug].label} (role baca-saja), otomatis tiap malam.</p>
+                <PullButton slug={c.slug} />
+              </div>
+            )}
           </section>
         ))}
       </div>

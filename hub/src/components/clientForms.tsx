@@ -1,6 +1,6 @@
 "use client";
 import { useActionState, useState } from "react";
-import { generateApiKey, importCsv, loginAction, runAI, setupAction, type FormState } from "@/app/actions";
+import { generateApiKey, importCsv, loginAction, pullNow, runAI, setupAction, type FormState } from "@/app/actions";
 
 const Msg = ({ s }: { s: FormState }) =>
   s?.error ? <p className="rounded-lg bg-bad/15 px-3 py-2 text-sm text-bad">{s.error}</p> : s?.ok ? <p className="rounded-lg bg-ok/15 px-3 py-2 text-sm text-ok">{s.ok}</p> : null;
@@ -59,6 +59,18 @@ export function ApiKeyButton({ id, has }: { id: number; has: boolean }) {
       <button className="btn !min-h-9 text-xs" disabled={pending} onClick={(e) => { if (has && !confirm("Membuat key baru akan mematikan key lama. Lanjut?")) e.preventDefault(); }}>
         {has ? "Ganti API key" : "Buat API key"}
       </button>
+    </form>
+  );
+}
+
+export function PullButton({ slug }: { slug: string }) {
+  const [st, act, pending] = useActionState(pullNow, null);
+  return (
+    <form action={act} className="space-y-2">
+      <input type="hidden" name="slug" value={slug} />
+      <button className="btn !min-h-9 text-xs" disabled={pending}>{pending ? "Menarik data…" : "Tarik sekarang"}</button>
+      {st?.ok && <p className="text-xs text-ok">{st.ok}</p>}
+      {st?.error && <p className="text-xs text-bad">{st.error}</p>}
     </form>
   );
 }

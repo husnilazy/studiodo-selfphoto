@@ -7,6 +7,7 @@ import { hashPin, hasUsers, requireOwner, sha256, startSession, verifyPin } from
 import { DEFAULT_PLAN, loadFacts } from "@/lib/metrics";
 import { aiNarrative, buildInsights } from "@/lib/insights";
 import { bookBalance } from "@/lib/recon";
+import { pullCompany } from "@/lib/pull";
 import { addMonths, thisMonth, today } from "@/lib/format";
 
 export type FormState = { error?: string; ok?: string } | null;
@@ -222,6 +223,18 @@ export async function runPayroll(fd: FormData) {
         [company, date, e.salary, `Gaji ${e.name} ${month}`, `payroll:${month}:${e.id}`]);
   });
   refresh();
+}
+
+/* ───────── Tarik langsung dari database unit ───────── */
+export async function pullNow(_: FormState, fd: FormData): Promise<FormState> {
+  await requireOwner();
+  try {
+    const r = await pullCompany(s(fd, "slug"));
+    refresh();
+    return { ok: `${r.upserted} baris diperbarui, ${r.removed} dihapus${r.errors.length ? `, ${r.errors.length} ditolak` : ""}.` };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Gagal menarik data." };
+  }
 }
 
 /* ───────── Rekonsiliasi saldo ───────── */
