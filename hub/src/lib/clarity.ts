@@ -3,7 +3,7 @@ import { q } from "./db";
 import { getShared } from "./sharedcost";
 import { addMonths, compact, today } from "./format";
 import { listEmployees } from "./payroll";
-import type { Facts } from "./metrics";
+import { sum, type Facts } from "./metrics";
 
 export type Check = { ok: boolean; level: "bad" | "warn" | "info"; title: string; detail: string; href: string };
 
@@ -58,6 +58,15 @@ export async function clarity(f: Facts) {
     const ok = docs.some((d) => d.company_id === c.id && d.kind === "perjanjian");
     out.push({ ok, level: "warn", title: `Perjanjian kemitraan ${c.name}`, detail: ok ? "Dokumen tersimpan." : "Belum ada dokumen kesepakatan modal & bagi hasil. Simpan di Dokumen.", href: "/dokumen" });
   }
+
+  // 8. Owner wajib digaji: penarikan kas (prive) di luar gaji = abu-abu. Gaji owner dibayar lewat slip, bukan ambil dari laci/kas.
+  const draw = sum(f.rows, { kind: "withdrawal", category: "prive", months: [f.now, prev] });
+  const ownerOnPayroll = emps.some((e) => e.active && e.role.toLowerCase().includes("owner") || e.position.toLowerCase().includes("owner") && e.active);
+  out.push({
+    ok: draw === 0, level: "warn", title: "Penarikan kas Owner di luar gaji",
+    detail: draw === 0 ? "Tidak ada prive dalam 2 bulan terakhir." : `Prive Rp ${compact(draw)} dalam 2 bulan terakhir. Aturannya Owner digaji lewat slip; ${ownerOnPayroll ? "catat penarikan ini sebagai gaji (potong dari slip) atau bagi hasil" : "aktifkan Owner di Gaji & tim lalu"} agar kas tidak diambil tanpa catatan.`,
+    href: "/gaji",
+  });
 
   const passed = out.filter((c) => c.ok).length;
   return { checks: out, score: out.length ? Math.round((passed / out.length) * 100) : 100, passed, total: out.length };
