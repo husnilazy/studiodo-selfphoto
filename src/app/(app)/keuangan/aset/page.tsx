@@ -7,7 +7,7 @@ import { Empty, Field, PageHeader, Stat } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { q } from "@/lib/db";
 import { fmtDate, fmtMonth, rupiah, todayWIB } from "@/lib/format";
-import { addAsset, runDepreciation } from "@/app/actions/finance";
+import { addAsset, importAssets, runDepreciation } from "@/app/actions/finance";
 
 export const metadata = { title: "Aset Tetap" };
 
@@ -34,6 +34,13 @@ export default async function AssetsPage() {
           <Sheet title="Catat Penyusutan" trigger={<button className="btn"><Icon name="clock" className="size-4" /> Susutkan Bulan</button>}>
             <ActionForm action={runDepreciation} submit="Catat Penyusutan">
               <Field label="Periode (bulan)" hint="Semua aset yang belum disusutkan di bulan itu akan dicatat sekaligus."><input type="month" name="period" className="input" defaultValue={today.slice(0, 7)} required /></Field>
+            </ActionForm>
+          </Sheet>
+          <Sheet title="Impor Aset (CSV)" wide trigger={<button className="btn"><Icon name="folder" className="size-4" /> Impor CSV</button>}>
+            <ActionForm action={importAssets} submit="Impor Aset">
+              <Field label="Data aset" hint="Satu aset per baris: tanggal,nama,harga,kode akun,umur bulan,catatan. Kode akun: 1501 Kamera & Lighting, 1502 Set/Dekorasi/Background, 1503 Perabot & Elektronik. Dicatat sebagai Aset awal (Modal pemilik). Baris yang sudah ada dilewati.">
+                <textarea name="csv" rows={9} className="input font-mono text-xs" required placeholder={"2026-04-20,Pembangunan studio tahap 1,4414912,1502,48,Modal dari kas Frameless"} />
+              </Field>
             </ActionForm>
           </Sheet>
           <Sheet title="Tambah Aset" wide trigger={<button className="btn btn-primary"><Icon name="plus" className="size-4" /> Tambah Aset</button>}>

@@ -51,7 +51,8 @@ export async function syncToHub(days = 45) {
      where not e.voided and e.date >= ${SINCE} group by 1, 2, 3`, [d]);
   const assets = await q<{ id: number; d: string; name: string; cost: number; by_owner: boolean }>(
     `select f.id, to_char(f.acquired_on, 'YYYY-MM-DD') as d, f.name, f.cost, (pf.type = 'equity') as by_owner
-     from fixed_assets f join accounts pf on pf.id = f.paid_from_account_id where f.acquired_on >= ${SINCE}`, [d]);
+     from fixed_assets f join accounts pf on pf.id = f.paid_from_account_id
+     where f.acquired_on >= ${SINCE} and f.note not ilike '%sudah di hub%'`, [d]); // catatan "sudah di Hub" = modal yang dicatat manual di Hub (hindari dobel)
   // Setoran modal (3101), prive (3201), dan pendapatan lain-lain (4105) yang dicatat manual lewat Keuangan → Modal/Prive/Transfer.
   const cash = await q<{ id: number; d: string; code: string; net: number; memo: string }>(
     `select j.id, to_char(j.date, 'YYYY-MM-DD') as d, a.code, (jl.credit - jl.debit)::bigint as net, j.memo

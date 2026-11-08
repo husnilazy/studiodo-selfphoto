@@ -170,6 +170,25 @@ export async function toggleAccount(id: number, _p: ActionState, _fd: FormData) 
   });
 }
 
+type NewAsset = { name: string; date: string; cost: number; salvage: number; life: number; assetAccountId: number; from: string; note: string };
+
+/** Mencatat satu aset tetap + jurnal pembeliannya. `from` = "equity" (aset awal / modal pemilik) atau id akun kas/bank. */
+async function insertAsset(q: typeof rootQ, userId: number, d: NewAsset) {
+  const asset = await codeOf(q, d.assetAccountId, ["asset"]);
+  const credit = d.from === "equity" ? { code: "3101" } : await codeOf(q, Number(d.from));
+  if (d.from !== "equity" && (credit as { subtype: string }).subtype !== "cash") throw new Error("Sumber dana harus akun kas/bank atau modal pemilik.");
+  const [a] = await q<{ id: number }>(
+    `insert into fixed_assets (name, acquired_on, cost, salvage, life_months, asset_account_id, paid_from_account_id, note, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
+    [d.name, d.date, d.cost, d.salvage, d.life, d.assetAccountId,
+      d.from === "equity" ? (await q<{ id: number }>("select id from accounts where code='3101'"))[0].id : Number(d.from), d.note, userId]);
+  const jid = await postJournal(q, {
+    date: d.date, memo: `${d.from === "equity" ? "Aset awal" : "Pembelian aset"}: ${d.name}`, refType: "asset", refId: a.id, userId,
+    lines: [{ account: asset.code, debit: d.cost }, { account: credit.code, credit: d.cost }],
+  });
+  await q("update fixed_assets set purchase_journal_id = $1 where id = $2", [jid, a.id]);
+}
+
 export async function addAsset(_p: ActionState, fd: FormData) {
   return safe(async () => {
     const user = await actionUser(["owner"]);
@@ -180,22 +199,45 @@ export async function addAsset(_p: ActionState, fd: FormData) {
     if (salvage < 0 || salvage >= cost) throw new Error("Nilai sisa harus lebih kecil dari harga perolehan.");
     if (life < 1) throw new Error("Umur manfaat minimal 1 bulan.");
     await tx(async (q) => {
-      const asset = await codeOf(q, int(fd, "asset_account_id"), ["asset"]);
-      const from = str(fd, "paid_from");
-      const credit = from === "equity" ? { code: "3101" } : await codeOf(q, Number(from));
-      if (from !== "equity" && (credit as { subtype: string }).subtype !== "cash") throw new Error("Sumber dana harus akun kas/bank atau modal pemilik.");
-      const [a] = await q<{ id: number }>(
-        `insert into fixed_assets (name, acquired_on, cost, salvage, life_months, asset_account_id, paid_from_account_id, note, created_by)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
-        [name, date, cost, salvage, life, int(fd, "asset_account_id"),
-          from === "equity" ? (await q<{ id: number }>("select id from accounts where code='3101'"))[0].id : Number(from), str(fd, "note"), user.id]);
-      const jid = await postJournal(q, {
-        date, memo: `${from === "equity" ? "Aset awal" : "Pembelian aset"}: ${name}`, refType: "asset", refId: a.id, userId: user.id,
-        lines: [{ account: asset.code, debit: cost }, { account: credit.code, credit: cost }],
-      });
-      await q("update fixed_assets set purchase_journal_id = $1 where id = $2", [jid, a.id]);
+      await insertAsset(q, user.id, { name, date, cost, salvage, life, assetAccountId: int(fd, "asset_account_id"), from: str(fd, "paid_from"), note: str(fd, "note") });
     });
     refresh();
+  });
+}
+
+/**
+ * Impor banyak aset awal (modal pemilik) dari CSV: `tanggal,nama,harga,kode_akun_aset,umur_bulan,catatan`.
+ * Kode akun aset: 1501 Kamera & Lighting, 1502 Set/Dekorasi/Background, 1503 Perabot & Elektronik.
+ * Aman diulang: baris dengan nama + tanggal + harga yang sama dilewati. Semua-atau-tidak-sama-sekali (satu transaksi).
+ */
+export async function importAssets(_p: ActionState, fd: FormData) {
+  return safe(async () => {
+    const user = await actionUser(["owner"]);
+    const lines = str(fd, "csv").split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !/^tanggal\b/i.test(l));
+    if (!lines.length) throw new Error("CSV kosong.");
+    if (lines.length > 200) throw new Error("Maksimal 200 baris sekali impor.");
+    let added = 0, skipped = 0;
+    await tx(async (q) => {
+      const accs = await q<{ id: number; code: string }>("select id, code from accounts where type = 'asset' and subtype = 'fixed' and active");
+      for (const [i, line] of lines.entries()) {
+        const [date, name, price, code, life, ...note] = line.split(",").map((x) => x.trim());
+        const at = `Baris ${i + 1}`;
+        validDate(date ?? "");
+        if (!name) throw new Error(`${at}: nama kosong.`);
+        const cost = parseInt((price ?? "").replace(/[^\d]/g, ""), 10);
+        if (!(cost > 0)) throw new Error(`${at}: harga tidak valid.`);
+        const acc = accs.find((a) => a.code === (code || "1502"));
+        if (!acc) throw new Error(`${at}: kode akun aset "${code}" tidak dikenal (pakai 1501, 1502, atau 1503).`);
+        const months = parseInt(life || "48", 10);
+        if (!(months >= 1)) throw new Error(`${at}: umur manfaat tidak valid.`);
+        const dup = await q("select 1 from fixed_assets where name = $1 and acquired_on = $2 and cost = $3 limit 1", [name, date, cost]);
+        if (dup.length) { skipped++; continue; }
+        await insertAsset(q, user.id, { name, date, cost, salvage: 0, life: months, assetAccountId: acc.id, from: "equity", note: note.join(",").trim() });
+        added++;
+      }
+    });
+    refresh();
+    return { ok: true, message: `${added} aset dicatat${skipped ? `, ${skipped} dilewati (sudah ada)` : ""}.` };
   });
 }
 
