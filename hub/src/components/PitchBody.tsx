@@ -1,5 +1,5 @@
 import { q } from "@/lib/db";
-import { cashBalance, lastMonths, summary, sum, type Facts } from "@/lib/metrics";
+import { cashBalance, lastMonths, NON_CAPITAL, summary, sum, type Facts } from "@/lib/metrics";
 import { compact, fullMonth, monthLabel, pct, rupiah } from "@/lib/format";
 import { Stat } from "./ui";
 import { Legend, StackedBars, TrendChart } from "./charts";
@@ -9,7 +9,7 @@ export default async function PitchBody({ f, publicView }: { f: Facts; publicVie
   const months = lastMonths(6, f.now), t12 = lastMonths(12, f.now);
   const rev12 = summary(f.rows, null, t12), g = summary(f.rows, null, [f.now]), last = summary(f.rows, null, [months[4]]);
   const growth = last.revenue > 0 ? ((g.revenue - last.revenue) / last.revenue) * 100 : null;
-  const capital = sum(f.rows, { kind: "capital_in" }) + sum(f.rows, { kind: ["asset_purchase", "expense"], funding: "partner" });
+  const capital = sum(f.rows, { kind: "capital_in", notCat: NON_CAPITAL }) + sum(f.rows, { kind: ["asset_purchase", "expense"], funding: "partner" });
   const assets = sum(f.rows, { kind: "asset_purchase" });
   const notes = await q<{ title: string; body: string }>("select title, body from notes where kind = 'pitching' order by id desc");
   return (

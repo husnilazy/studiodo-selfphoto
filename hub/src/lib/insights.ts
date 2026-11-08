@@ -1,5 +1,5 @@
 import "server-only";
-import { allocation, capitalByPartner, cashBalance, lastMonths, summary, sum, targetFor, type Facts } from "./metrics";
+import { allocation, capitalByPartner, cashBalance, lastMonths, NON_CAPITAL, summary, sum, targetFor, type Facts } from "./metrics";
 import { addMonths, compact, pct, rupiah } from "./format";
 
 export type Insight = { level: "bad" | "warn" | "ok" | "info"; scope: string; title: string; detail: string; action: string };
@@ -87,7 +87,7 @@ export function buildInsights(f: Facts): Insight[] {
   }
   // Aset yang dibeli dari kas tanpa jejak modal
   const assetCash = sum(f.rows, { kind: "asset_purchase", funding: "company" });
-  const capCash = sum(f.rows, { kind: "capital_in" });
+  const capCash = sum(f.rows, { kind: "capital_in", notCat: NON_CAPITAL });
   if (assetCash > 0 && capCash === 0) out.push({ level: "warn", scope: "Grup", title: "Aset dibeli tapi belum ada catatan modal", detail: `Ada ${compact(assetCash)} pembelian aset dari kas, namun belum ada setoran modal tercatat. Ini sumber ambiguitas porsi bagi hasil.`, action: "Catat setoran modal tiap partner & tandai pembelian aset yang dibayar pribadi sebagai 'dibayar partner'." });
   if (gNow.revenue > 0 && gNow.profit > 0 && gNow.margin >= 25) out.push({ level: "ok", scope: "Grup", title: `Margin grup sehat ${pct(gNow.margin)}`, detail: `Laba bulan ini ${compact(gNow.profit)}.`, action: "Waktu yang baik menambah dana cadangan dan membagi hasil sesuai aturan." });
 

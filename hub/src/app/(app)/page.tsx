@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { buildInsights } from "@/lib/insights";
-import { cashBalance, lastMonths, loadFacts, summary, sum, targetFor } from "@/lib/metrics";
+import { cashBalance, lastMonths, loadFacts, NON_CAPITAL, summary, sum, targetFor } from "@/lib/metrics";
 import { addMonths, compact, fullMonth, monthLabel, pct, rupiah } from "@/lib/format";
 import { CompanyDot, Empty, Pill, SectionHead, Stat } from "@/components/ui";
 import { Legend, Progress, StackedBars, TrendChart } from "@/components/charts";
@@ -14,7 +14,7 @@ export default async function Home() {
   const g = summary(f.rows, null, [f.now]), gp = summary(f.rows, null, [prev]);
   const cash = cashBalance(f.rows, null);
   const assets = sum(f.rows, { kind: "asset_purchase" });
-  const capital = sum(f.rows, { kind: "capital_in" }) + sum(f.rows, { kind: ["asset_purchase", "expense"], funding: "partner" });
+  const capital = sum(f.rows, { kind: "capital_in", notCat: NON_CAPITAL }) + sum(f.rows, { kind: ["asset_purchase", "expense"], funding: "partner" });
   const delta = gp.revenue > 0 ? ((g.revenue - gp.revenue) / gp.revenue) * 100 : null;
   const insights = buildInsights(f).filter((i) => i.level !== "ok").slice(0, 3);
   const gTarget = targetFor(f, null, f.now, "revenue");

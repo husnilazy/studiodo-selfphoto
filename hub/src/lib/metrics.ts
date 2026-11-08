@@ -61,7 +61,8 @@ export async function loadFacts(): Promise<Facts> {
   return { companies, partners, cps, rows, targets, plans: pm, now: thisMonth() };
 }
 
-type Pred = { company?: number | null; months?: string[]; kind?: string | string[]; category?: string; funding?: string; partner?: number };
+export const NON_CAPITAL = ["saldo_awal", "pinjaman"]; // setoran kas yang bukan modal partner
+type Pred = { company?: number | null; months?: string[]; kind?: string | string[]; category?: string; notCat?: string[]; funding?: string; partner?: number };
 export function sum(rows: Row[], p: Pred = {}): number {
   const kinds = p.kind ? (Array.isArray(p.kind) ? p.kind : [p.kind]) : null;
   const ms = p.months ? new Set(p.months) : null;
@@ -71,6 +72,7 @@ export function sum(rows: Row[], p: Pred = {}): number {
     if (ms && !ms.has(r.m)) continue;
     if (kinds && !kinds.includes(r.kind)) continue;
     if (p.category && r.category !== p.category) continue;
+    if (p.notCat && p.notCat.includes(r.category)) continue;
     if (p.funding && r.funding !== p.funding) continue;
     if (p.partner != null && r.partner_id !== p.partner) continue;
     t += Number(r.amt);

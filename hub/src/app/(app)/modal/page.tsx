@@ -1,4 +1,4 @@
-import { capitalByPartner, loadFacts, sum } from "@/lib/metrics";
+import { capitalByPartner, loadFacts, NON_CAPITAL, sum } from "@/lib/metrics";
 import { compact, pct, rupiah } from "@/lib/format";
 import { CompanyDot, Empty, PageHead, Stat } from "@/components/ui";
 import { Donut } from "@/components/charts";
@@ -9,7 +9,7 @@ export const metadata = { title: "Modal" };
 export default async function Page() {
   const f = await loadFacts();
   const palette = ["#b8c4ff", "#5fd1c4", "#e9c46a", "#e69ad0", "#6ea8ff"];
-  const totalCash = sum(f.rows, { kind: "capital_in" });
+  const totalCash = sum(f.rows, { kind: "capital_in", notCat: NON_CAPITAL });
   const totalPartner = sum(f.rows, { kind: ["asset_purchase", "expense"], funding: "partner" });
   return (
     <>
