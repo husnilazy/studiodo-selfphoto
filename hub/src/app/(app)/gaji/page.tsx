@@ -12,14 +12,17 @@ export const metadata = { title: "Gaji & Tim" };
 export default async function Page({ searchParams }: { searchParams: Promise<{ p?: string }> }) {
   const sp = await searchParams;
   const period = /^\d{4}-\d{2}$/.test(sp.p ?? "") ? sp.p! : thisMonth();
-  const [f, user, emps, slips] = await Promise.all([
+  const [f, user, emps, debts, slips] = await Promise.all([
     loadFacts(), currentUser(), listEmployees(),
+    q<{ employee_id: number; left: number }>("select employee_id, sum(amount - paid)::bigint as left from obligations where employee_id is not null and amount > paid group by employee_id"),
     q<{ employee_id: number; id: number; net: number; status: string }>("select employee_id, id, net::bigint as net, status from payslips where period = $1", [thisMonthOr(sp.p)]),
   ]);
   const owner = user?.role === "owner";
   const active = emps.filter((e) => e.active);
   const monthly = active.reduce((a, e) => a + (e.pay_type === "monthly" ? e.salary : e.pay_type === "weekly" ? e.salary * weeksIn(period) : 0), 0);
   const slipBy = new Map(slips.map((s) => [s.employee_id, s]));
+  const debtBy = new Map(debts.map((d) => [d.employee_id, Number(d.left)]));
+  const debtTotal = [...debtBy.values()].reduce((a, b) => a + b, 0);
   const paid = slips.filter((s) => s.status === "dibayar").reduce((a, s) => a + Number(s.net), 0);
 
   return (
@@ -36,6 +39,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
         <Stat label="Slip dibuat" value={`${slips.length} / ${active.length}`} />
         <Stat label="Sudah dibayar" value={rupiah(paid)} />
       </div>
+      {debtTotal > 0 && (
+        <Link href="/kewajiban" className="card card-pad mt-4 flex items-center justify-between text-sm">
+          <span><b className="font-display">Hutang gaji belum dibayar</b><span className="block text-xs text-muted">Kurangan gaji dari bulan-bulan sebelumnya. Bayar/cicil di halaman Hutang & piutang.</span></span>
+          <b className="tnum text-warn">{rupiah(debtTotal)}</b>
+        </Link>
+      )}
 
       {owner && (
         <form action={createAllPayslips} className="card card-pad mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -62,6 +71,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
                           <div className="text-xs text-muted">{PAY_TYPE_LABEL[e.pay_type]}{e.pay_type !== "freelance" && ` · ${rupiah(e.salary)}${e.pay_type === "weekly" ? "/minggu" : "/bulan"}`}</div>
                         </Link>
                         <span className="flex items-center gap-2">
+                          {(debtBy.get(e.id) ?? 0) > 0 && <Pill tone="bad">hutang gaji {rupiah(debtBy.get(e.id)!)}</Pill>}
                           {!e.active && <Pill tone="warn">nonaktif</Pill>}
                           {sl ? <Link href={`/slip/${sl.id}`}><Pill tone={sl.status === "dibayar" ? "ok" : "info"}>Slip {sl.status === "dibayar" ? "dibayar" : "draft"} · {rupiah(Number(sl.net))}</Pill></Link> : e.active && <Pill>belum ada slip</Pill>}
                         </span>

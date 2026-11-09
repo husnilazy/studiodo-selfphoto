@@ -153,17 +153,42 @@ export async function postCondition(fd: FormData) {
 export async function addObligation(fd: FormData) {
   await requireOwner();
   const kind = s(fd, "kind") === "piutang" ? "piutang" : "hutang", party = s(fd, "party"), amount = n(fd, "amount");
-  if (!party || amount <= 0) throw new Error("Pihak dan nominal wajib diisi.");
+  if ((!party && !n(fd, "employee")) || amount <= 0) throw new Error("Pihak (atau karyawan) dan nominal wajib diisi.");
   const due = s(fd, "due");
   if (due && !DATE.test(due)) throw new Error("Tanggal jatuh tempo tidak valid.");
-  await q("insert into obligations (kind, party, company_id, amount, due, note) values ($1,$2,$3,$4,$5::date,$6)", [kind, party, n(fd, "company") || null, amount, due || null, s(fd, "note")]);
+  // Hutang gaji: bila karyawan dipilih, unit & nama pihak diambil dari data karyawan.
+  const empId = kind === "hutang" ? n(fd, "employee") || null : null, period = s(fd, "period");
+  if (period && !PERIOD.test(period)) throw new Error("Periode tidak valid.");
+  let company = n(fd, "company") || null, partyName = party;
+  if (empId) {
+    const [e] = await q<{ name: string; company_id: number }>("select name, company_id from employees where id = $1", [empId]);
+    if (!e) throw new Error("Karyawan tidak ditemukan.");
+    company = e.company_id; if (!party) partyName = e.name;
+  }
+  await q("insert into obligations (kind, party, company_id, amount, due, note, employee_id, period) values ($1,$2,$3,$4,$5::date,$6,$7,$8)",
+    [kind, partyName, company, amount, due || null, s(fd, "note"), empId, empId ? period || null : null]);
   refresh();
 }
+/** Bayar/terima. Untuk hutang gaji: tiap pembayaran (cicilan) tercatat sebagai biaya gaji di unit karyawan, jadi kas ikut turun. */
 export async function payObligation(fd: FormData) {
   await requireOwner();
-  const id = n(fd, "id"), amt = n(fd, "amount");
+  const id = n(fd, "id"), amt = n(fd, "amount"), date = s(fd, "date") || today();
   if (amt <= 0) throw new Error("Nominal harus lebih dari 0.");
-  await q("update obligations set paid = least(amount, paid + $2) where id = $1", [id, amt]);
+  if (!DATE.test(date)) throw new Error("Tanggal tidak valid.");
+  await tx(async (t) => {
+    const [ob] = await t<{ id: number; employee_id: number | null; period: string | null; company_id: number | null; amount: number; paid: number }>(
+      "select id, employee_id, period, company_id, amount::bigint amount, paid::bigint paid from obligations where id = $1 for update", [id]);
+    if (!ob) throw new Error("Data tidak ditemukan.");
+    const pay = Math.min(amt, Number(ob.amount) - Number(ob.paid));
+    if (pay <= 0) throw new Error("Sudah lunas.");
+    await t("update obligations set paid = paid + $2 where id = $1", [id, pay]);
+    if (ob.employee_id && ob.company_id) {
+      const [e] = await t<{ name: string }>("select name from employees where id = $1", [ob.employee_id]);
+      await t(
+        `insert into transactions (company_id, date, kind, category, amount, memo, source, external_id) values ($1,$2,'expense','gaji',$3,$4,'payroll',$5)`,
+        [ob.company_id, date, pay, `Bayar hutang gaji ${e?.name ?? ""}${ob.period ? " " + ob.period : ""}`.trim(), `oblpay:${id}:${Date.now()}`]);
+    }
+  });
   refresh();
 }
 export async function deleteObligation(fd: FormData) { await requireOwner(); await q("delete from obligations where id = $1", [n(fd, "id")]); refresh(); }
