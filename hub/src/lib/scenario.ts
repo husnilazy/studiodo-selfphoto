@@ -10,6 +10,7 @@ export async function scenarioFor(f: Facts, c: Company) {
   const card = { ...DEFAULT_RATE_CARD, ...(saved?.value ?? {}) };
   const lines = profitShare(f, c, [f.now]).lines;
   if (lines.length < 2) return null;
+  const roles = (saved?.value?.roles?.length ? saved.value.roles : DEFAULT_RATE_CARD.roles).filter((r) => r.on).map((r) => ({ key: r.key, label: r.label, weight: Number(r.weight) }));
   const members: ScenarioMember[] = lines.map((l) => ({ name: l.partner.name, capShare: l.capShare, workShare: l.workShare, capital: l.capital }));
-  return { companyName: c.name, card: { margin: card.margin, tools: card.tools, direct: card.direct }, reservePct: Number(c.reserve_pct), capitalPct: Number(c.share_capital_pct), members };
+  return { companyName: c.name, card: { margin: card.margin, tools: card.tools, direct: card.direct }, reservePct: Number(c.reserve_pct), capitalPct: Number(c.share_capital_pct), members, roles };
 }
