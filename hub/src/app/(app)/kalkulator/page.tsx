@@ -1,3 +1,5 @@
+import ShareScenario from "@/components/ShareScenario";
+import { scenarioFor } from "@/lib/scenario";
 import { currentUser } from "@/lib/auth";
 import { one } from "@/lib/db";
 import { loadFacts, profitShare } from "@/lib/metrics";
@@ -21,6 +23,7 @@ export default async function Page() {
   const names = [...new Set([...emps.filter((e) => e.active).map((e) => e.name), ...f.partners.map((p) => p.name)])];
   const toolsHint = assets.filter((a) => a.company_id === fc?.id && (a.status === "aktif" || a.status === "perbaikan")).reduce((t, a) => t + Number(a.cost) / (a.life_years * 12), 0);
   const owner = user?.role === "owner";
+  const sc = fc ? await scenarioFor(f, fc) : null;
 
   // Indeks tarif: budget umum × peran default (semua peran aktif sesuai kartu)
   const tiers = [3_000_000, 5_000_000, 10_000_000, 25_000_000, 50_000_000];
@@ -34,6 +37,8 @@ export default async function Page() {
       <ProjectCalc card={card} names={names} owner={owner} companyName={fc?.name ?? "Frameless"} toolsHint={toolsHint}
         share={{ reserve: Number(fc?.reserve_pct ?? 0), capital: Number(fc?.share_capital_pct ?? 50), work: Number(fc?.share_work_pct ?? 50),
           members: ps ? ps.lines.map((l) => ({ name: l.partner.name, capShare: l.capShare, workShare: l.workShare })) : [] }} />
+
+      {sc && <ShareScenario {...sc} />}
 
       <section className="card card-pad mt-4">
         <SectionHead title="Indeks crew (acuan cepat)" note="Honor per peran untuk budget umum, memakai persen & bobot standar saat ini. Pakai sebagai patokan negosiasi dan penawaran." />

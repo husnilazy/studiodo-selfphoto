@@ -6,6 +6,8 @@ import { EMP_COLS, ITEM_KIND, PAY_TYPE_LABEL, computeSlip, weeksIn, type Emp } f
 import { addMonths, fullMonth, monthLabel, pct, rupiah, thisMonth } from "@/lib/format";
 import { Empty, Pill, SectionHead, Stat } from "@/components/ui";
 import PitchBody from "@/components/PitchBody";
+import ShareScenario from "@/components/ShareScenario";
+import { scenarioFor } from "@/lib/scenario";
 import { TrendChart } from "@/components/charts";
 
 export const metadata = { title: "Area saya" };
@@ -122,6 +124,7 @@ export default async function Page() {
             </table></div>
           )}
         </section>
+        {user.partnerId && (await Promise.all(rows.map((r) => scenarioFor(f, r.c)))).map((sc, i) => sc && <ShareScenario key={rows[i].c.id} {...sc} />)}
         <div className="mt-4"><PitchBody f={f} publicView /></div>
         <section className="card card-pad mt-4"><SectionHead title="Dokumen" /><DocList list={files} empty="Belum ada dokumen." /></section>
       </>
