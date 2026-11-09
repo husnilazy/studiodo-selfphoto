@@ -7,7 +7,7 @@ import { applyEvents } from "./ingest";
  * Penarik langsung: Hub membaca ringkasan harian dari database Neon unit usaha lewat role BACA-SAJA (`hub_reader`),
  * lalu menerapkannya ke buku besar. Tidak ada perubahan di aplikasi sumber. Idempoten (id event stabil + jendela tanggal).
  */
-type Ev = { id: string; date: string; kind: "revenue" | "expense" | "asset_purchase"; category: string; amount: number; memo: string };
+type Ev = { id: string; date: string; kind: "revenue" | "expense" | "asset_purchase"; category: string; amount: number; memo: string; project?: string; ref?: string };
 type Q = (sql: string, params?: unknown[]) => Promise<Record<string, unknown>[]>;
 
 /** Semua timestamp di sumber disimpan UTC tanpa zona; +7 jam = tanggal WIB. */
@@ -35,18 +35,21 @@ const fcCat = (name: string) => FC_CAT.find(([re]) => re.test(name))?.[1] ?? "op
 /** Frameless Creative (frameless super app): pembayaran invoice + pemasukan lain, biaya, dan peralatan. */
 async function frameless(q: Q, since: string): Promise<Ev[]> {
   const out: Ev[] = [];
-  const pay = await q(`select ${WIB('"paidAt"')} as d, sum(amount)::float8 as t, count(*)::int as c from payments where ${WIB('"paidAt"')} >= $1 group by 1`, [since]);
-  for (const r of pay) if (n(r.t) > 0) out.push({ id: `fc:pay:${s(r.d)}`, date: s(r.d), kind: "revenue", category: "proyek", amount: n(r.t), memo: `Pembayaran invoice (${n(r.c)})` });
+  // Per pembayaran (bukan ringkasan harian) supaya tiap angka bisa ditelusuri ke invoice, klien, dan proyeknya.
+  const pay = await q(`select p.id, ${WIB('p."paidAt"')} as d, p.amount::float8 as t, p.method, i.number as inv,
+      pr.title as ptitle, pr.client as pclient, c.name as cname
+    from payments p join invoices i on i.id = p."invoiceId" left join projects pr on pr.id::text = i."projectId" left join clients c on c.id = i."clientId"
+    where ${WIB('p."paidAt"')} >= $1`, [since]);
+  for (const r of pay) if (n(r.t) > 0) {
+    const who = s(r.cname) || s(r.pclient);
+    out.push({ id: `fc:pay:${s(r.id)}`, date: s(r.d), kind: "revenue", category: "proyek", amount: n(r.t), project: s(r.ptitle) || undefined, ref: s(r.inv) || undefined,
+      memo: `Pembayaran ${s(r.inv) || "invoice"}${who ? ` · ${who}` : ""}${r.method ? ` (${s(r.method)})` : ""}` });
+  }
   const inc = await q(`select to_char(date, 'YYYY-MM-DD') as d, sum(amount)::float8 as t, count(*)::int as c from income_entries where to_char(date, 'YYYY-MM-DD') >= $1 group by 1`, [since]);
   for (const r of inc) if (n(r.t) > 0) out.push({ id: `fc:inc:${s(r.d)}`, date: s(r.d), kind: "revenue", category: "lainnya", amount: n(r.t), memo: `Pemasukan lain (${n(r.c)})` });
-  const exp = await q(`select ${WIB("date")} as d, category, sum(amount)::float8 as t from expenses where ${WIB("date")} >= $1 group by 1, 2`, [since]);
-  const byId = new Map<string, Ev>();
-  for (const r of exp) {
-    const category = fcCat(s(r.category)), id = `fc:exp:${s(r.d)}:${category}`, cur = byId.get(id);
-    if (cur) cur.amount += n(r.t);
-    else byId.set(id, { id, date: s(r.d), kind: "expense", category, amount: n(r.t), memo: `Biaya ${category}` });
-  }
-  out.push(...[...byId.values()].filter((e) => e.amount > 0));
+  const exp = await q(`select e.id, ${WIB("e.date")} as d, e.category, e.description, e.amount::float8 as t, pr.title as ptitle
+    from expenses e left join projects pr on pr.id::text = e."projectId" where ${WIB("e.date")} >= $1`, [since]);
+  for (const r of exp) if (n(r.t) > 0) out.push({ id: `fc:exp:${s(r.id)}`, date: s(r.d), kind: "expense", category: fcCat(s(r.category)), amount: n(r.t), project: s(r.ptitle) || undefined, memo: s(r.description).slice(0, 120) || `Biaya ${s(r.category)}` });
   const eq = await q(`select id, name, to_char(purchase_date, 'YYYY-MM-DD') as d, purchase_price::float8 as p from equipment where purchase_price > 0 and purchase_date is not null and to_char(purchase_date, 'YYYY-MM-DD') >= $1`, [since]);
   for (const r of eq) out.push({ id: `fc:eq:${s(r.id)}`, date: s(r.d), kind: "asset_purchase", category: "alat", amount: n(r.p), memo: s(r.name).slice(0, 80) });
   return out;

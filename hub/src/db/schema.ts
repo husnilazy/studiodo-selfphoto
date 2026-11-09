@@ -1,5 +1,5 @@
 // Skema Frameless Hub. Idempotent; naikkan SCHEMA_VERSION setiap ada perubahan.
-export const SCHEMA_VERSION = "5";
+export const SCHEMA_VERSION = "6";
 
 export const SCHEMA = `
 create table if not exists users (
@@ -64,6 +64,8 @@ create table if not exists notes (
 
 -- v4: akses per peran, profil karyawan, gaji & slip, dokumen, hutang/piutang
 create unique index if not exists users_name_u on users (lower(name));
+alter table transactions add column if not exists project text;
+alter table transactions add column if not exists ref text;
 alter table users add column if not exists employee_id int references employees(id) on delete set null;
 alter table users add column if not exists partner_id int references partners(id) on delete set null;
 -- pay_type: monthly (gaji pokok bulanan) | weekly (mingguan) | freelance (fee per proyek, tanpa gaji pokok)

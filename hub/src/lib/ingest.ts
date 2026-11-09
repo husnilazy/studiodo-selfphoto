@@ -38,12 +38,14 @@ export async function applyEvents(company: { id: number }, events: unknown[], wi
         partnerId = hit.id;
       }
       await t(
-        `insert into transactions (company_id,date,kind,category,amount,funding,partner_id,memo,source,external_id)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        `insert into transactions (company_id,date,kind,category,amount,funding,partner_id,memo,source,external_id,project,ref)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          on conflict (company_id, external_id) where external_id is not null
          do update set date=excluded.date, kind=excluded.kind, category=excluded.category, amount=excluded.amount,
-                       funding=excluded.funding, partner_id=excluded.partner_id, memo=excluded.memo`,
-        [company.id, date, kind, String(e.category ?? "lainnya").slice(0, 40), amount, funding, partnerId, String(e.memo ?? "").slice(0, 200), source, id],
+                       funding=excluded.funding, partner_id=excluded.partner_id, memo=excluded.memo,
+                       project=excluded.project, ref=excluded.ref`,
+        [company.id, date, kind, String(e.category ?? "lainnya").slice(0, 40), amount, funding, partnerId, String(e.memo ?? "").slice(0, 200), source, id,
+         String(e.project ?? "").trim().slice(0, 120) || null, String(e.ref ?? "").trim().slice(0, 80) || null],
       );
       upserted++;
     }
