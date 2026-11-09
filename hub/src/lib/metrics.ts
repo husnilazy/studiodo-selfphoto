@@ -6,7 +6,7 @@ import { addMonths, thisMonth } from "./format";
 export type Company = {
   id: number; slug: string; name: string; kind: string; color: string; started_on: string | null; active: boolean;
   api_key_prefix: string | null; last_sync_at: string | null;
-  share_capital_pct: number; share_work_pct: number; reserve_pct: number;
+  share_capital_pct: number; share_work_pct: number; reserve_pct: number; share_company_assets: boolean;
 };
 export type Partner = { id: number; name: string; role: string };
 export type CP = { company_id: number; partner_id: number; equity_pct: number; work_weight: number };
@@ -47,11 +47,11 @@ export type Facts = {
 /** Dicache per permintaan: layout + halaman + komponen memakai satu set query, bukan beberapa. */
 export const loadFacts = cache(async function loadFacts(): Promise<Facts> {
   const [companies, partners, cps, rows, targets, plans] = await Promise.all([
-    q<Company>("select id, slug, name, kind, color, started_on, active, api_key_prefix, last_sync_at, share_capital_pct, share_work_pct, reserve_pct from companies where active order by sort, id"),
+    q<Company>("select id, slug, name, kind, color, started_on, active, api_key_prefix, last_sync_at, share_capital_pct, share_work_pct, reserve_pct, share_company_assets from companies where active order by sort, id"),
     q<Partner>("select id, name, role from partners where active order by id"),
     q<CP>("select company_id, partner_id, equity_pct, work_weight from company_partners"),
     q<Row>(`select t.company_id, to_char(t.date,'YYYY-MM') as m, t.kind, t.category, t.funding, t.partner_id, sum(t.amount)::bigint as amt,
-                   (t.kind = 'asset_purchase' and t.funding = 'partner' and exists (select 1 from assets a where a.tx_id = t.id and a.status in ('dijual','hilang'))) as gone
+                   (t.kind = 'asset_purchase' and exists (select 1 from assets a where a.tx_id = t.id and a.status in ('dijual','hilang'))) as gone
             from transactions t group by 1,2,3,4,5,6,8`),
     q<Target>("select company_id, period, metric, value from targets"),
     q<{ company_id: number; bucket: string; pct: number }>("select company_id, bucket, pct from alloc_plans"),
@@ -136,6 +136,11 @@ export function profitShare(f: Facts, company: Company, months: string[]) {
     const c = cap.get(m.partner_id);
     return c ? c.cash + c.inKind + c.expenses : 0;
   });
+  // Opsi unit: alat/aset yang dibeli dari kas perusahaan (hasil kerja bersama) dihitung modal bersama, dibagi rata antar partner.
+  const sharedAssets = company.share_company_assets
+    ? f.rows.filter((r) => r.company_id === company.id && r.kind === "asset_purchase" && r.funding !== "partner" && !r.gone).reduce((a, r) => a + Number(r.amt), 0)
+    : 0;
+  if (sharedAssets > 0 && members.length > 0) for (let i = 0; i < capTotals.length; i++) capTotals[i] += sharedAssets / members.length;
   const capSum = capTotals.reduce((a, b) => a + b, 0);
   const wSum = members.reduce((a, m) => a + Number(m.work_weight), 0);
   const lines = members.map((m, i) => {

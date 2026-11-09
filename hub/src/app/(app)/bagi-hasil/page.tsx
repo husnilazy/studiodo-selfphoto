@@ -59,6 +59,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
                     <Field label="Cadangan dari laba (%)"><input name="reserve" type="number" min={0} max={50} defaultValue={c.reserve_pct} className="input" /></Field>
                     <Field label="Mulai beroperasi"><input name="started" type="date" defaultValue={c.started_on ?? ""} className="input" /></Field>
                     <div className="flex items-end"><button className="btn btn-primary w-full">Simpan</button></div>
+                    <label className="flex items-start gap-2 text-sm sm:col-span-4"><input type="checkbox" name="shared_assets" defaultChecked={c.share_company_assets} className="mt-1" /><span>Alat & aset yang dibeli dari kas perusahaan dihitung sebagai <b className="font-medium">modal bersama</b>, dibagi rata antar partner di kolam modal (cocok bila semua partner ikut menghasilkan kas itu). Modal pribadi tetap dihitung untuk pemiliknya.</span></label>
                     <p className="text-xs text-muted sm:col-span-4">Kolam kerja = 100% − kolam modal. Bobot kerja tiap partner diatur di Pengaturan → Partner. Contoh: SNAPCUP modal 100% milikmu → atur kolam modal 100%.</p>
                   </form>
                 </details>

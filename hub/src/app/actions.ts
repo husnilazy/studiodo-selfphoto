@@ -156,7 +156,7 @@ export async function addCompany(fd: FormData) {
 export async function saveCompanyRules(fd: FormData) {
   await requireOwner();
   const cap = Math.min(100, Math.max(0, n(fd, "cap"))), reserve = Math.min(50, Math.max(0, n(fd, "reserve")));
-  await q("update companies set share_capital_pct=$2, share_work_pct=$3, reserve_pct=$4, started_on=nullif($5,'')::date where id=$1", [n(fd, "id"), cap, 100 - cap, reserve, s(fd, "started")]);
+  await q("update companies set share_capital_pct=$2, share_work_pct=$3, reserve_pct=$4, started_on=nullif($5,'')::date, share_company_assets=$6 where id=$1", [n(fd, "id"), cap, 100 - cap, reserve, s(fd, "started"), fd.get("shared_assets") === "on"]);
   refresh();
 }
 export async function addPartner(fd: FormData) {

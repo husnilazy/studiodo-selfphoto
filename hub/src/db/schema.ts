@@ -1,5 +1,5 @@
 // Skema Frameless Hub. Idempotent; naikkan SCHEMA_VERSION setiap ada perubahan.
-export const SCHEMA_VERSION = "7";
+export const SCHEMA_VERSION = "8";
 
 export const SCHEMA = `
 create table if not exists users (
@@ -111,6 +111,9 @@ create table if not exists obligations (
 -- v7: hutang gaji per karyawan & periode. Dibayar (dicicil) → otomatis tercatat sebagai biaya gaji di unitnya.
 alter table obligations add column if not exists employee_id int references employees(id) on delete set null;
 alter table obligations add column if not exists period text;
+
+-- v8: aset perusahaan (dibeli dari kas) dihitung sebagai modal bersama, dibagi rata antar partner di kolam modal.
+alter table companies add column if not exists share_company_assets boolean not null default false;
 
 -- v5: inventaris aset. status: aktif | perbaikan | rusak | dijual | hilang. tx_id = pembelian di buku besar (bila ada).
 create table if not exists assets (
