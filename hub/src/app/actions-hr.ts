@@ -282,7 +282,8 @@ export async function importAssetsFromLedger() {
   await requireOwner();
   await q(`insert into assets (company_id, name, category, acquired_on, cost, tx_id)
            select t.company_id, coalesce(nullif(trim(t.memo), ''), t.category), 'alat', t.date, t.amount, t.id
-           from transactions t where t.kind = 'asset_purchase' and not exists (select 1 from assets a where a.tx_id = t.id)`);
+           from transactions t where t.kind = 'asset_purchase' and not exists (select 1 from assets a where a.tx_id = t.id)
+             and coalesce(t.memo, '') !~* '(ipo?n[gk]|cicil+an)'`); // cicilan alat bukan barang: barangnya dicatat sendiri di inventaris
   refresh();
 }
 
