@@ -10,7 +10,8 @@ export type Company = {
 };
 export type Partner = { id: number; name: string; role: string };
 export type CP = { company_id: number; partner_id: number; equity_pct: number; work_weight: number };
-export type Row = { company_id: number; m: string; kind: string; category: string; funding: string; partner_id: number | null; amt: number };
+/** gone = pembelian aset yang barangnya kini dijual/hilang (hasil jual masuk kantong pemiliknya, jadi bukan lagi modal di perusahaan). */
+export type Row = { company_id: number; m: string; kind: string; category: string; funding: string; partner_id: number | null; amt: number; gone?: boolean };
 export type Target = { company_id: number | null; period: string; metric: string; value: number };
 
 export const BUCKETS = [
@@ -49,8 +50,9 @@ export const loadFacts = cache(async function loadFacts(): Promise<Facts> {
     q<Company>("select id, slug, name, kind, color, started_on, active, api_key_prefix, last_sync_at, share_capital_pct, share_work_pct, reserve_pct from companies where active order by sort, id"),
     q<Partner>("select id, name, role from partners where active order by id"),
     q<CP>("select company_id, partner_id, equity_pct, work_weight from company_partners"),
-    q<Row>(`select company_id, to_char(date,'YYYY-MM') as m, kind, category, funding, partner_id, sum(amount)::bigint as amt
-            from transactions group by 1,2,3,4,5,6`),
+    q<Row>(`select t.company_id, to_char(t.date,'YYYY-MM') as m, t.kind, t.category, t.funding, t.partner_id, sum(t.amount)::bigint as amt,
+                   (t.kind = 'asset_purchase' and t.funding = 'partner' and exists (select 1 from assets a where a.tx_id = t.id and a.status in ('dijual','hilang'))) as gone
+            from transactions t group by 1,2,3,4,5,6,8`),
     q<Target>("select company_id, period, metric, value from targets"),
     q<{ company_id: number; bucket: string; pct: number }>("select company_id, bucket, pct from alloc_plans"),
   ]);
@@ -114,7 +116,7 @@ export function capitalByPartner(rows: Row[], company: number | null) {
     if (r.partner_id == null) continue;
     const a = Number(r.amt), e = get(r.partner_id);
     if (r.kind === "capital_in") e.cash += a;
-    else if (r.kind === "asset_purchase" && r.funding === "partner") e.inKind += a;
+    else if (r.kind === "asset_purchase" && r.funding === "partner") { if (!r.gone) e.inKind += a; }
     else if (r.kind === "expense" && r.funding === "partner") e.expenses += a;
     else if (r.kind === "withdrawal") e.withdrawn += a;
   }
