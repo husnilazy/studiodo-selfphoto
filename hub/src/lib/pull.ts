@@ -15,14 +15,27 @@ const WIB = (col: string) => `to_char(${col} + interval '7 hours', 'YYYY-MM-DD')
 const n = (v: unknown) => Math.round(Number(v) || 0);
 const s = (v: unknown) => String(v ?? "");
 
-/** Photobooth APP = platform SaaS: pendapatan = langganan tenant (Midtrans, status paid) + pembayaran manual dari admin. */
+/**
+ * Photobooth APP = platform SaaS: pendapatan HANYA dari langganan platform yang dibayar tenant.
+ * `tenant_payments` adalah buku langganan itu: dicatat superadmin (manual) dan juga diisi otomatis saat pembayaran Midtrans
+ * berstatus paid. Karena itu `billing_orders` TIDAK dibaca lagi (akan menghitung langganan online dua kali).
+ * Omzet kiosk milik tenant (sesi foto pelanggan tenant) bukan pendapatan platform dan tidak dibaca sama sekali.
+ */
 async function photobooth(q: Q, _since: string): Promise<Ev[]> {
+  const base = (join: boolean) => `select tp.id::text as id, ${WIB("tp.created_at")} as d, tp.amount::float8 as t, tp.method, tp.plan_name, tp.period_days${join ? ", t.name as tname" : ""}
+    from tenant_payments tp ${join ? "left join tenants t on t.id = tp.tenant_id" : ""} order by tp.created_at`;
+  let rows: Record<string, unknown>[];
+  try { rows = await q(base(true)); } catch { rows = await q(base(false)); } // bila role baca-saja belum boleh membaca tabel tenants
   const out: Ev[] = [];
-  const paid = await q(`select ${WIB("paid_at")} as d, sum(amount)::float8 as t, count(*)::int as c
-    from billing_orders where status = 'paid' and paid_at is not null group by 1`);
-  for (const r of paid) if (n(r.t) > 0) out.push({ id: `pb:sub:${s(r.d)}`, date: s(r.d), kind: "revenue", category: "langganan", amount: n(r.t), memo: `Langganan tenant (${n(r.c)} order)` });
-  const man = await q(`select ${WIB("created_at")} as d, sum(amount)::float8 as t, count(*)::int as c from tenant_payments group by 1`);
-  for (const r of man) if (n(r.t) > 0) out.push({ id: `pb:man:${s(r.d)}`, date: s(r.d), kind: "revenue", category: "langganan", amount: n(r.t), memo: `Pembayaran manual tenant (${n(r.c)})` });
+  for (const r of rows) {
+    if (n(r.t) <= 0) continue;
+    const who = s(r.tname);
+    out.push({
+      id: `pb:pay:${s(r.id)}`, date: s(r.d), kind: "revenue", category: "langganan", amount: n(r.t),
+      memo: `Langganan${who ? ` ${who}` : " tenant"}${r.plan_name ? ` · ${s(r.plan_name)}` : ""}${n(r.period_days) ? ` ${n(r.period_days)} hari` : ""} (${s(r.method) || "manual"})`,
+      project: who || undefined,
+    });
+  }
   return out;
 }
 
