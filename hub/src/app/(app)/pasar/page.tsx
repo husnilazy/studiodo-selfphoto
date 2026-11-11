@@ -68,7 +68,7 @@ export default async function Page() {
         <ul className="space-y-1.5 text-sm text-muted">
           <li>• <b className="text-fg">Dasar</b> memakai pertumbuhan aktual (6 bulan terakhir vs 6 bulan sebelumnya, dibatasi −20%…+40%), atau angka yang kamu isi.</li>
           <li>• <b className="text-fg">Konservatif</b> = pertumbuhan dasar −10 poin, <b className="text-fg">Optimis</b> = +10 poin.</li>
-          <li>• <b className="text-fg">Pipeline</b> proyek dikalikan peluang menang, hanya ditambahkan ke tahun 1 skenario dasar. Setelah CRM Frameless tersambung, angka ini bisa diisi otomatis dari data proyek.</li>
+          <li>• <b className="text-fg">Pipeline</b> proyek dikalikan peluang menang, hanya ditambahkan ke tahun 1 skenario dasar. Ke depan angka ini bisa diisi otomatis dari data proyek di Frameless Super App.</li>
         </ul>
       </section>
     </>
