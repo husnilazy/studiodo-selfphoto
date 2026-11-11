@@ -71,7 +71,7 @@ async function frameless(q: Q, since: string): Promise<Ev[]> {
 /** `since`: tarikan hanya mengambil data pada/ setelah tanggal ini. Frameless: sebelum itu buku kas Excel adalah sumber utama. */
 export const SOURCES: Record<string, { env: string; label: string; since: string; build: (q: Q, since: string) => Promise<Ev[]> }> = {
   photobooth: { env: "PHOTOBOOTH_DATABASE_URL", label: "Neon Photobooth APP", since: "2000-01-01", build: photobooth },
-  frameless: { env: "FRAMELESS_DATABASE_URL", label: "Neon Frameless Super App", since: process.env.FRAMELESS_PULL_SINCE?.trim() || "2026-09-01", build: frameless },
+  frameless: { env: "FRAMELESS_DATABASE_URL", label: "Neon Frameless Super App", since: process.env.FRAMELESS_PULL_SINCE?.trim() || "2026-11-12", build: frameless },
 };
 export const configured = (slug: string) => !!process.env[SOURCES[slug]?.env ?? ""]?.trim();
 
