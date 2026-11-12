@@ -129,9 +129,10 @@ export async function addTransaction(fd: FormData) {
   if (kind === "capital_in" || kind === "revenue" || kind === "withdrawal") funding = "company";
   if ((kind === "capital_in" || funding === "partner") && !partner) throw new Error("Pilih partner yang menyetor / membayar.");
   const category = kind === "capital_in" ? "modal" : kind === "withdrawal" ? s(fd, "category") || "prive" : s(fd, "category") || "lainnya";
+  const cover = kind === "expense" ? Math.min(60, Math.max(1, n(fd, "cover_months") || 1)) : 1;
   await q(
-    "insert into transactions (company_id,date,kind,category,amount,funding,partner_id,memo) values ($1,$2,$3,$4,$5,$6,$7,$8)",
-    [company, s(fd, "date") || today(), kind, category, amount, funding, partner, s(fd, "memo")],
+    "insert into transactions (company_id,date,kind,category,amount,funding,partner_id,memo,cover_months) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+    [company, s(fd, "date") || today(), kind, category, amount, funding, partner, s(fd, "memo"), cover],
   );
   refresh();
 }

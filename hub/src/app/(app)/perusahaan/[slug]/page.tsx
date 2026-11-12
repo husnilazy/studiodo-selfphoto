@@ -8,11 +8,12 @@ import { CompanyDot, Empty, PageHead, Pill, Stat } from "@/components/ui";
 import { Donut, Legend, Progress, TrendChart } from "@/components/charts";
 import TxForm from "@/components/TxForm";
 import LiveRefresh from "@/components/LiveRefresh";
-import { allocate, getShared } from "@/lib/sharedcost";
+import { allocate, getShared, loadSharedItems } from "@/lib/sharedcost";
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const [f, user, sharedCfg] = await Promise.all([loadFacts(), currentUser(), getShared()]);
+  const sharedItems = await loadSharedItems(f, sharedCfg);
   const c = f.companies.find((x) => x.slug === slug);
   if (!c) notFound();
   const months = lastMonths(6, f.now);
@@ -35,7 +36,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
       </div>
 
       {(() => {
-        const a = allocate(f, sharedCfg, [f.now]);
+        const a = allocate(f, sharedCfg, [f.now], sharedItems);
         const u = a.units.find((x) => x.company.id === c.id);
         if (!u || a.pool === 0) return null;
         return (

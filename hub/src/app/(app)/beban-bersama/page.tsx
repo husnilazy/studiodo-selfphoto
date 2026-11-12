@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import { loadFacts, summary } from "@/lib/metrics";
-import { allocate, getShared, SHARED_CATEGORY_CHOICES } from "@/lib/sharedcost";
-import { saveSharedCost } from "@/app/actions-hr";
+import { allocate, coverRange, covers, getShared, loadSharedItems, perMonth, poolFor, SHARED_CATEGORY_CHOICES } from "@/lib/sharedcost";
+import { CoverForm, SharedCostForm } from "@/components/SharedForms";
 import { addMonths, fullMonth, pct, rupiah } from "@/lib/format";
-import { CompanyDot, Field, PageHead, Pill, SectionHead, Stat } from "@/components/ui";
+import { CompanyDot, PageHead, Pill, SectionHead, Stat } from "@/components/ui";
 
 export const metadata = { title: "Beban bersama" };
 
@@ -13,7 +13,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
   const [f, user, cfg] = await Promise.all([loadFacts(), currentUser(), getShared()]);
   const month = /^\d{4}-\d{2}$/.test(sp.m ?? "") ? sp.m! : f.now;
   const owner = user?.role === "owner";
-  const a = allocate(f, cfg, [month]);
+  const items = await loadSharedItems(f, cfg);
+  const a = allocate(f, cfg, [month], items);
+  // 12 bulan sekitar bulan terpilih: tunjukkan beban per bulan setelah dibagi rata
+  const strip = Array.from({ length: 12 }, (_, i) => addMonths(month, i - 5)).map((m) => ({ m, v: poolFor(items, [m]) }));
+  const active = items.filter((it) => covers(it, month));
+  const multi = items.filter((it) => it.cover > 1).length;
   const labels = new Map<string, string>(SHARED_CATEGORY_CHOICES.map(([k, l]) => [k, l]));
 
   return (
@@ -52,23 +57,57 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
         </table>
       </section>
 
+      <section className="card card-pad mt-4 overflow-x-auto">
+        <SectionHead title="Beban per bulan" note="Biaya yang dibayar sekali untuk beberapa bulan (mis. sewa ruko setahun) dibagi rata per bulan, jadi tiap bulan menanggung bagian yang sama." />
+        <table className="w-full min-w-[560px] text-sm">
+          <thead><tr>{strip.map((x) => <th key={x.m} className={`th text-right ${x.m === month ? "!text-fg" : ""}`}>{fullMonth(x.m)}</th>)}</tr></thead>
+          <tbody><tr>{strip.map((x) => <td key={x.m} className={`td tnum text-right ${x.m === month ? "font-semibold" : "text-muted"}`}>{x.v ? rupiah(x.v) : "–"}</td>)}</tr></tbody>
+        </table>
+      </section>
+
+      <section className="card card-pad mt-4 overflow-x-auto">
+        <SectionHead title={`Rincian beban ${fullMonth(month)}`} note={`${active.length} pembayaran masuk kolam bulan ini · total ${rupiah(a.pool)}`} />
+        {active.length === 0 ? <p className="text-sm text-muted">Belum ada biaya kategori ini di unit host untuk bulan ini.</p> : (
+          <table className="w-full min-w-[620px] text-sm">
+            <thead><tr><th className="th">Dibayar</th><th className="th">Keterangan</th><th className="th text-right">Total dibayar</th><th className="th text-right">Berlaku</th><th className="th text-right">Per bulan</th></tr></thead>
+            <tbody>{active.map((it) => (
+              <tr key={it.id}>
+                <td className="td tnum">{it.date}</td>
+                <td className="td"><Link href={`/transaksi/${it.id}`} className="hover:underline">{it.memo || labels.get(it.category) || it.category}</Link><span className="ml-2 text-xs text-muted">{labels.get(it.category) ?? it.category}</span></td>
+                <td className="td tnum text-right">{rupiah(it.amount)}</td>
+                <td className="td text-right text-muted">{it.cover > 1 ? `${it.cover} bln (${coverRange(it)})` : "1 bulan"}</td>
+                <td className="td tnum text-right font-medium">{rupiah(perMonth(it))}</td>
+              </tr>))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {owner && (
+        <section className="card card-pad mt-4 overflow-x-auto">
+          <SectionHead title="Atur masa berlaku pembayaran" note={multi ? `${multi} pembayaran dibagi lebih dari 1 bulan.` : "Contoh: sewa ruko dibayar setahun sekali → isi 12 bulan. Bagian per bulan = total ÷ bulan."} />
+          {items.length === 0 ? <p className="text-sm text-muted">Belum ada biaya di kategori yang dibagi.</p> : (
+            <table className="w-full min-w-[640px] text-sm">
+              <thead><tr><th className="th">Dibayar</th><th className="th">Keterangan</th><th className="th text-right">Total</th><th className="th text-right">Per bulan</th><th className="th text-right">Berlaku untuk</th></tr></thead>
+              <tbody>{items.slice(0, 40).map((it) => (
+                <tr key={it.id}>
+                  <td className="td tnum">{it.date}</td>
+                  <td className="td">{it.memo || labels.get(it.category) || it.category}</td>
+                  <td className="td tnum text-right">{rupiah(it.amount)}</td>
+                  <td className="td tnum text-right text-muted">{rupiah(perMonth(it))}</td>
+                  <td className="td"><CoverForm id={it.id} cover={it.cover} /></td>
+                </tr>))}
+              </tbody>
+            </table>
+          )}
+          <p className="mt-2 text-xs text-muted">Transaksi baru juga punya kolom “Berlaku untuk (bulan)” di halaman Transaksi.</p>
+        </section>
+      )}
+
       {owner && (
         <section className="card card-pad mt-4">
           <SectionHead title="Atur porsi (Owner)" note="Total harus 100%. Contoh: Frameless 40%, STUDIODO 50% (Self Photo + Photobooth), SNAPCUP 10%." />
-          <form action={saveSharedCost} className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-4">
-              {f.companies.map((c) => (
-                <Field key={c.id} label={`${c.name} (%)`}><input name={`pct_${c.slug}`} type="number" step="0.5" min={0} max={100} defaultValue={cfg.pct[c.slug] ?? 0} className="input tnum" /></Field>
-              ))}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Unit yang membayar (host)"><select name="host" defaultValue={cfg.host} className="input">{f.companies.map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}</select></Field>
-              <div><span className="label">Kategori biaya yang dibagi</span>
-                <div className="flex flex-wrap gap-x-5 gap-y-2 pt-1 text-sm">{SHARED_CATEGORY_CHOICES.map(([k, l]) => (
-                  <label key={k} className="inline-flex items-center gap-2"><input type="checkbox" name={`cat_${k}`} defaultChecked={cfg.categories.includes(k)} className="size-4 accent-[var(--accent)]" />{l}</label>))}</div></div>
-            </div>
-            <button className="btn btn-primary">Simpan porsi</button>
-          </form>
+          <SharedCostForm companies={f.companies.map((c) => ({ slug: c.slug, name: c.name }))} cfg={cfg} choices={SHARED_CATEGORY_CHOICES} configured={cfg.configured} />
         </section>
       )}
       <p className="mt-4 text-xs text-muted">Photobooth APP dan STUDIODO Self Photo bisa dipisah: bagi 50% itu sesuai kesepakatanmu (mis. 40% + 10%). Alokasi ini hanya tampilan analisis; transaksi asli tetap tercatat di unit yang membayar.</p>

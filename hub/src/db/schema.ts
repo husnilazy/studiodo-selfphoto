@@ -1,5 +1,5 @@
 // Skema Frameless Hub. Idempotent; naikkan SCHEMA_VERSION setiap ada perubahan.
-export const SCHEMA_VERSION = "8";
+export const SCHEMA_VERSION = "9";
 
 export const SCHEMA = `
 create table if not exists users (
@@ -126,4 +126,7 @@ create table if not exists assets (
 );
 create unique index if not exists assets_tx_u on assets (tx_id) where tx_id is not null;
 create index if not exists assets_co on assets (company_id, status);
+
+-- v9: satu pembayaran bisa berlaku untuk beberapa bulan (mis. sewa ruko setahun = 12). Dipakai alokasi beban bersama.
+alter table transactions add column if not exists cover_months int not null default 1 check (cover_months between 1 and 60);
 `;

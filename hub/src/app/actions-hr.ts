@@ -194,18 +194,30 @@ export async function payObligation(fd: FormData) {
 export async function deleteObligation(fd: FormData) { await requireOwner(); await q("delete from obligations where id = $1", [n(fd, "id")]); refresh(); }
 
 /* ───────── Beban bersama ───────── */
-export async function saveSharedCost(fd: FormData) {
-  await requireOwner();
+export async function saveSharedCost(_: unknown, fd: FormData): Promise<{ ok?: string; error?: string }> {
+  try { await requireOwner(); } catch (e) { return { error: (e as Error).message }; }
   const cos = await q<{ slug: string }>("select slug from companies where active");
   const pct: Record<string, number> = {};
   for (const c of cos) pct[c.slug] = Math.max(0, Number(s(fd, `pct_${c.slug}`)) || 0);
   const total = Object.values(pct).reduce((a, b) => a + b, 0);
-  if (Math.round(total * 100) !== 10000) throw new Error(`Total porsi harus 100% (sekarang ${total}%).`);
+  if (Math.round(total * 100) !== 10000) return { error: `Total porsi harus 100% (sekarang ${Math.round(total * 100) / 100}%).` };
   const cats = SHARED_CATEGORY_CHOICES.map(([k]) => k as string).filter((k) => fd.get(`cat_${k}`) === "on");
-  if (!cats.length) throw new Error("Pilih minimal satu kategori biaya yang dibagi.");
+  if (!cats.length) return { error: "Pilih minimal satu kategori biaya yang dibagi." };
   const host = cos.some((c) => c.slug === s(fd, "host")) ? s(fd, "host") : "frameless";
   await q("insert into settings (key, value) values ('shared_cost', $1::jsonb) on conflict (key) do update set value = excluded.value", [JSON.stringify({ host, categories: cats, pct })]);
   refresh();
+  return { ok: "Porsi tersimpan." };
+}
+
+/** Atur berapa bulan satu pembayaran biaya berlaku (mis. sewa ruko setahun = 12). */
+export async function setCoverMonths(_: unknown, fd: FormData): Promise<{ ok?: string; error?: string }> {
+  try { await requireOwner(); } catch (e) { return { error: (e as Error).message }; }
+  const id = Number(s(fd, "id")), cover = Math.round(Number(s(fd, "cover")));
+  if (!id || !Number.isFinite(cover) || cover < 1 || cover > 60) return { error: "Isi 1–60 bulan." };
+  const r = await q("update transactions set cover_months = $2 where id = $1 and kind = 'expense' returning id", [id, cover]);
+  if (!r.length) return { error: "Transaksi biaya tidak ditemukan." };
+  refresh();
+  return { ok: `Berlaku ${cover} bulan.` };
 }
 
 /* ───────── Valuasi & penggalangan dana ───────── */

@@ -44,6 +44,7 @@ export default function TxForm({ companies, partners, company }: { companies: Co
           {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </Field>
+      <Field label="Berlaku untuk (bulan)"><input name="cover_months" type="number" min={1} max={60} defaultValue={1} className="input tnum" title="Biaya yang dibayar sekali untuk beberapa bulan, mis. sewa ruko setahun = 12. Dipakai di Beban bersama." /></Field>
       <Field label="Catatan"><input name="memo" className="input" placeholder="mis. Beli lighting untuk proyek X" /></Field>
       <div className="sm:col-span-2 lg:col-span-4"><button className="btn btn-primary">Simpan transaksi</button>
         <span className="ml-3 text-xs text-muted">Beli alat dari uang pribadi? Pilih “Beli aset” + “Uang pribadi partner” + nama partner — otomatis tercatat sebagai modal.</span></div>
