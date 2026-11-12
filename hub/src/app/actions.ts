@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { one, q, tx } from "@/lib/db";
-import { hashPin, hasUsers, requireOwner, sha256, startSession, verifyPin } from "@/lib/auth";
+import { hashPin, hasUsers, lockedUser, requireOwner, sha256, startSession, verifyPin } from "@/lib/auth";
 import { DEFAULT_PLAN, loadFacts } from "@/lib/metrics";
 import { aiNarrative, buildInsights } from "@/lib/insights";
 import { bookBalance } from "@/lib/recon";
@@ -66,6 +66,27 @@ export async function loginAction(_: FormState, fd: FormData): Promise<FormState
   await q("update users set failed_attempts = 0, locked_until = null where id = $1", [u.id]);
   await startSession(u.id);
   redirect("/");
+}
+
+/** Buka layar kunci: cukup PIN. Batas percobaan sama dengan login (5x salah → dikunci 5 menit). */
+export async function unlockAction(_: FormState, fd: FormData): Promise<FormState> {
+  const pin = s(fd, "pin");
+  if (!/^\d{6}$/.test(pin)) return { error: "PIN harus 6 digit." };
+  const lu = await lockedUser();
+  if (!lu) return { error: "Sesi kunci berakhir. Silakan masuk dengan nama dan PIN." };
+  const u = await one<{ id: number; pin_hash: string; failed_attempts: number; locked_until: string | null }>(
+    "select id, pin_hash, failed_attempts, locked_until from users where id = $1 and active", [lu.id]);
+  if (!u) return { error: "Akun tidak aktif." };
+  if (u.locked_until && new Date(u.locked_until) > new Date()) return { error: "Terlalu banyak percobaan. Coba lagi beberapa menit lagi." };
+  if (!verifyPin(pin, u.pin_hash)) {
+    const f = u.failed_attempts + 1;
+    if (f >= 5) await q("update users set failed_attempts = 0, locked_until = now() + interval '5 minutes' where id = $1", [u.id]);
+    else await q("update users set failed_attempts = $2 where id = $1", [u.id, f]);
+    return { error: f >= 5 ? "PIN salah 5x. Akun dikunci 5 menit." : `PIN salah. Sisa percobaan ${5 - f}.` };
+  }
+  await q("update users set failed_attempts = 0, locked_until = null where id = $1", [u.id]);
+  await startSession(u.id);
+  return { ok: "open" };
 }
 
 const ROLES = ["owner", "partner", "investor", "karyawan"];

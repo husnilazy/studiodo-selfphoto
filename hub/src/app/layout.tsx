@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="id" className={inter.variable} suppressHydrationWarning>
       <body className="min-h-dvh antialiased">
-        <Script id="fh-theme" strategy="beforeInteractive">{`try{var t=localStorage.getItem("fh_theme");if(t==="light")document.documentElement.dataset.theme="light"}catch(e){}`}</Script>
+        <Script id="fh-theme" strategy="beforeInteractive">{`try{var t=localStorage.getItem("fh_theme");if(t==="light")document.documentElement.dataset.theme="light";if(localStorage.getItem("fh_hide")==="1"||(!sessionStorage.getItem("fh_started")&&localStorage.getItem("fh_hide_def")!=="0"))document.documentElement.dataset.privacy="hidden"}catch(e){}`}</Script>
         {children}
         <PwaRegister />
       </body>

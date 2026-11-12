@@ -11,7 +11,9 @@ export type User = { id: number; name: string; role: Role; employeeId: number | 
 export const ROLE_LABEL: Record<Role, string> = { owner: "Owner", partner: "Partner (lihat semua)", investor: "Investor", karyawan: "Karyawan" };
 export const isTeam = (u: { role: Role }) => u.role === "owner" || u.role === "partner";
 const COOKIE = "fh_session";
-const MAX_AGE = 60 * 60 * 24 * 30;
+const LOCK_COOKIE = "fh_lock";
+const MAX_AGE = 60 * 60 * 24 * 14; // 14 hari (sebelumnya 30): perangkat yang lupa keluar tidak terbuka berbulan-bulan
+const LOCK_AGE = 60 * 60 * 12;     // layar kunci diingat 12 jam, setelah itu harus login penuh
 
 function secret() {
   const s = process.env.SESSION_SECRET?.trim();
@@ -37,11 +39,45 @@ export const sha256 = (v: string) => createHash("sha256").update(v).digest("hex"
 export async function startSession(userId: number) {
   const exp = Math.floor(Date.now() / 1000) + MAX_AGE;
   const body = `${userId}.${exp}`;
-  (await cookies()).set(COOKIE, `${body}.${sign(body)}`, {
+  const jar = await cookies();
+  jar.set(COOKIE, `${body}.${sign(body)}`, {
     httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: MAX_AGE,
   });
+  jar.delete(LOCK_COOKIE);
 }
-export async function endSession() { (await cookies()).delete(COOKIE); }
+export async function endSession() {
+  const jar = await cookies();
+  jar.delete(COOKIE);
+  jar.delete(LOCK_COOKIE);
+}
+
+/**
+ * Kunci sesi: cookie sesi DIHAPUS di server (bukan sekadar ditutup layar), jadi tanpa PIN tidak ada data yang bisa dibuka,
+ * walau orang lain mengutak-atik browser. Yang tersisa hanya penanda bertanda-tangan "siapa yang mengunci" supaya
+ * layar kunci bisa menyapa dan cukup minta PIN (bukan nama + PIN).
+ */
+export async function lockSession() {
+  const u = await currentUser();
+  const jar = await cookies();
+  jar.delete(COOKIE);
+  if (!u) return;
+  const exp = Math.floor(Date.now() / 1000) + LOCK_AGE;
+  const body = `${u.id}.${exp}`;
+  jar.set(LOCK_COOKIE, `${body}.${sign(body)}`, {
+    httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: LOCK_AGE,
+  });
+}
+/** Pengguna yang sedang mengunci layar (bukan sesi aktif). */
+export const lockedUser = cache(async function lockedUser(): Promise<{ id: number; name: string } | null> {
+  const raw = (await cookies()).get(LOCK_COOKIE)?.value;
+  if (!raw) return null;
+  const [id, exp, sig] = raw.split(".");
+  if (!id || !exp || !sig) return null;
+  const expect = sign(`${id}.${exp}`);
+  if (sig.length !== expect.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expect))) return null;
+  if (Number(exp) < Date.now() / 1000) return null;
+  return one<{ id: number; name: string }>("select id, name from users where id = $1 and active", [Number(id)]);
+});
 
 export const currentUser = cache(async function currentUser(): Promise<User | null> {
   const raw = (await cookies()).get(COOKIE)?.value;

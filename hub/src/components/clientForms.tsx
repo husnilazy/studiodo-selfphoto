@@ -1,6 +1,6 @@
 "use client";
-import { useActionState, useState } from "react";
-import { generateApiKey, importCsv, loginAction, pullNow, runAI, setupAction, type FormState } from "@/app/actions";
+import { useActionState, useEffect, useState } from "react";
+import { generateApiKey, importCsv, loginAction, pullNow, runAI, setupAction, unlockAction, type FormState } from "@/app/actions";
 
 const Msg = ({ s }: { s: FormState }) =>
   s?.error ? <p className="rounded-lg bg-bad/15 px-3 py-2 text-sm text-bad">{s.error}</p> : s?.ok ? <p className="rounded-lg bg-ok/15 px-3 py-2 text-sm text-ok">{s.ok}</p> : null;
@@ -15,6 +15,30 @@ export function LoginForm() {
         <input name="pin" type="password" inputMode="numeric" maxLength={6} autoComplete="current-password" className="input tnum tracking-[.5em]" required /></label>
       <Msg s={st} />
       <button className="btn btn-primary w-full" disabled={pending}>{pending ? "Memeriksa…" : "Masuk"}</button>
+    </form>
+  );
+}
+
+/** Layar kunci: cukup PIN. Setelah benar, kembali ke halaman terakhir (path internal saja). */
+export function UnlockForm({ name }: { name: string }) {
+  const [st, act, pending] = useActionState(unlockAction, null);
+  useEffect(() => {
+    if (st?.ok !== "open") return;
+    let to = "/";
+    try {
+      const r = sessionStorage.getItem("fh_return") || "";
+      if (/^\/(?!\/)[\w\-./%?=&]*$/.test(r) && !r.startsWith("/login")) to = r;
+      sessionStorage.removeItem("fh_return");
+    } catch { /* abaikan */ }
+    window.location.replace(to);
+  }, [st]);
+  return (
+    <form action={act} className="space-y-4">
+      <p className="text-center text-sm text-muted">Sesi dikunci untuk <b className="text-fg">{name}</b></p>
+      <label className="block"><span className="label">PIN 6 digit</span>
+        <input name="pin" type="password" inputMode="numeric" maxLength={6} autoComplete="current-password" className="input tnum tracking-[.5em]" required autoFocus /></label>
+      <Msg s={st?.error ? st : null} />
+      <button className="btn btn-primary w-full" disabled={pending || st?.ok === "open"}>{pending || st?.ok === "open" ? "Membuka…" : "Buka kunci"}</button>
     </form>
   );
 }

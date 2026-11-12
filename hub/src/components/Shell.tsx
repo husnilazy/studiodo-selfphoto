@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import Logo from "./Logo";
 import ThemeToggle from "./ThemeToggle";
 import InstallPrompt from "./InstallPrompt";
+import { PrivacyButtons, PrivacyEngine } from "./Privacy";
 
 type Co = { slug: string; name: string };
 type Tab = { href: string; label: string };
@@ -46,7 +47,8 @@ export default function Shell({ user, companies, cash, children }: { user: { nam
   const initial = user.name.trim().charAt(0).toUpperCase() || "?";
 
   return (
-    <div className="min-h-dvh">
+    <div className="min-h-dvh" id="fh-shell">
+      <PrivacyEngine />
       {/* Navbar pill (desktop) */}
       <div className="no-print sticky top-0 z-40 hidden px-8 pt-5 md:block">
         <div className="mx-auto flex max-w-6xl items-center gap-2 rounded-full border border-line py-2 pl-5 pr-2 backdrop-blur-xl" style={{ background: "var(--nav-bg)" }}>
@@ -60,6 +62,7 @@ export default function Shell({ user, companies, cash, children }: { user: { nam
             <span className="hidden items-center gap-2 rounded-full border border-line px-3 py-1.5 text-xs text-muted lg:inline-flex" title="Total kas seluruh grup">
               <i className="live-dot size-1.5 rounded-full bg-ok" />Kas <b className="tnum font-medium text-fg">Rp {fmt(cash)}</b>
             </span>
+            <PrivacyButtons />
             <ThemeToggle />
             <form action="/api/logout" method="post">
               <button className="flex items-center gap-2 rounded-full border border-line py-1 pl-1 pr-3.5 text-sm text-fg transition hover:border-[color-mix(in_srgb,var(--fg)_28%,transparent)]" title="Keluar">
@@ -76,6 +79,7 @@ export default function Shell({ user, companies, cash, children }: { user: { nam
         <Link href="/" aria-label="Frameless Hub"><Logo height={13} /></Link>
         <div className="flex items-center gap-2">
           <span className="tnum rounded-full border border-line px-2.5 py-1 text-[11px] text-muted">Rp {fmt(cash)}</span>
+          <PrivacyButtons />
           <ThemeToggle />
         </div>
       </header>

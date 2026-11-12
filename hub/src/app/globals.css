@@ -29,6 +29,13 @@ body {
 }
 * { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 .tnum { font-variant-numeric: tabular-nums; }
+
+/* Mode sembunyikan saldo: selama teks belum di-mask (sebelum hidrasi selesai) seluruh tampilan di-blur supaya tidak ada nominal yang sempat terlihat.
+   Setelah mask aktif (html[data-masked]) blur dicabut; hanya grafik yang tetap di-blur karena bentuknya membocorkan angka. */
+html[data-privacy="hidden"]:not([data-masked]) #fh-shell { filter: blur(14px); }
+html[data-privacy="hidden"] #fh-shell main svg[role="img"] { filter: blur(7px); }
+html[data-privacy="hidden"] #fh-shell main .stat-value { user-select: none; }
+@media print { html[data-privacy="hidden"] #fh-shell main { filter: none; } }
 .font-display { font-weight: 500 !important; letter-spacing: -.02em; }
 .stat-value { font-weight: 400 !important; letter-spacing: -.025em; }
 
