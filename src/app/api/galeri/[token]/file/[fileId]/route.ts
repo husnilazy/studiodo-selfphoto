@@ -1,18 +1,30 @@
-import { customerByToken, downloadableFiles } from "@/lib/gallery";
+import { q } from "@/lib/db";
 import { driveMedia } from "@/lib/gdrive";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-/** Unduh satu file dari galeri (dialirkan lewat server, nama file asli, tanpa halaman peringatan virus Google). */
-export async function GET(_req: Request, ctx: { params: Promise<{ token: string; fileId: string }> }) {
+const TOKEN = /^[A-Za-z0-9_-]{20,64}$/;
+
+/**
+ * Unduh satu file galeri. Cepat: satu query lalu langsung arahkan browser ke unduhan Google Drive
+ * (file sudah "siapa saja yang punya link"), jadi unduhan mulai seketika tanpa lewat server.
+ * `?via=server` = alirkan lewat server (cadangan bila langsung gagal).
+ */
+export async function GET(req: Request, ctx: { params: Promise<{ token: string; fileId: string }> }) {
   const { token, fileId } = await ctx.params;
-  const c = await customerByToken(token);
-  if (!c) return new Response("Galeri tidak ditemukan.", { status: 404 });
   const id = Number(fileId);
-  const [f] = Number.isInteger(id) ? await downloadableFiles(c.id, [id]) : [];
+  if (!TOKEN.test(token) || !Number.isInteger(id) || id <= 0) return new Response("Tidak ditemukan.", { status: 404 });
+  const [f] = await q<{ drive_file_id: string; title: string; mime: string }>(
+    `select f.drive_file_id, f.title, f.mime from customer_files f join customers c on c.id = f.customer_id
+      where c.gallery_token = $1 and f.id = $2 and f.drive_file_id is not null and f.kind in ('foto_asli','foto_edit','video') and f.status in ('siap','terkirim')`,
+    [token, id]);
   if (!f) return new Response("File tidak ditemukan.", { status: 404 });
-  const up = await driveMedia(f.driveId).catch(() => null);
+
+  if (new URL(req.url).searchParams.get("via") !== "server") {
+    return Response.redirect(`https://drive.usercontent.google.com/download?id=${encodeURIComponent(f.drive_file_id)}&export=download&confirm=t`, 302);
+  }
+  const up = await driveMedia(f.drive_file_id).catch(() => null);
   if (!up || !up.ok || !up.body) return new Response("File belum bisa diambil dari penyimpanan. Coba lagi sebentar.", { status: 502 });
   const h = new Headers({
     "Content-Type": up.headers.get("content-type") ?? (f.mime || "application/octet-stream"),

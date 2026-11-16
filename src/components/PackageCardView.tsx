@@ -1,9 +1,9 @@
 import Icon from "./Icon";
 import Countdown from "./site/Countdown";
-import { imageSrc } from "@/lib/siteConfig";
 import { CATEGORY_LABEL, rupiah } from "@/lib/format";
 import type { Deal, GroupDeal } from "@/lib/pricing";
-import { IMAGE_SIZES, imageSizeKey, imageStyle, priceSuffix, type PackageImage } from "@/lib/packageUtils";
+import PackageSlides from "./PackageSlides";
+import { IMAGE_SIZES, imageSizeKey, packageImages, priceSuffix, type PackageImage } from "@/lib/packageUtils";
 
 export type CardPkg = PackageImage & {
   name: string; category: string; description: string; includes: string; price: number;
@@ -18,26 +18,25 @@ export const cardBullets = (p: Pick<CardPkg, "description" | "includes">) =>
 export default function PackageCardView({ p, footer, className = "", style }: { p: CardPkg; footer?: React.ReactNode; className?: string; style?: React.CSSProperties }) {
   const h = IMAGE_SIZES[imageSizeKey(p.image_size)].h;
   const bullets = cardBullets(p);
+  const urls = packageImages(p);
   return (
     <article className={`pkg-card glass lift spot group flex flex-col overflow-hidden rounded-3xl ${className}`} style={style}>
       <div className="relative overflow-hidden" style={{ height: h, transition: "height .35s cubic-bezier(.2,.8,.2,1)" }}>
-        {p.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageSrc(p.image_url)} alt={p.name} loading="lazy" style={imageStyle(p)}
-            className={`pkg-img size-full ${p.image_fit === "contain" ? "bg-panel2 p-2" : "transition-transform duration-[900ms] ease-out group-hover:scale-[1.06]"}`} />
+        {urls.length > 0 ? (
+          <PackageSlides urls={urls} name={p.name} fit={p.image_fit === "contain" ? "contain" : "cover"} x={p.image_x ?? 50} y={p.image_y ?? 50} />
         ) : (
           <div className="relative size-full" style={{ background: "linear-gradient(135deg, color-mix(in oklab, var(--accent) 34%, transparent), color-mix(in oklab, var(--accent-2) 26%, transparent))" }}>
             <Icon name="camera" className="absolute -bottom-5 -right-3 size-28 -rotate-12 text-accent/25 transition-transform duration-700 group-hover:rotate-0" />
           </div>
         )}
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/55 to-transparent" />
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-2/5 bg-gradient-to-t from-black/55 to-transparent" />
         {p.deal && (
-          <span className="ribbon absolute right-3 top-3 rounded-full bg-gradient-to-br from-rose-500 to-orange-500 px-3 py-1 text-xs font-extrabold text-white shadow-lg shadow-rose-500/40">
+          <span className="ribbon absolute right-3 top-3 z-[3] rounded-full bg-gradient-to-br from-rose-500 to-orange-500 px-3 py-1 text-xs font-extrabold text-white shadow-lg shadow-rose-500/40">
             {p.deal.percent > 0 ? `-${p.deal.percent}%` : "PROMO"}
           </span>
         )}
-        <span className="absolute left-3 top-3 rounded-full bg-black/45 px-3 py-1 text-[11px] font-bold tracking-wide text-white backdrop-blur-md">{CATEGORY_LABEL[p.category] ?? p.category}</span>
-        <div className="absolute bottom-3 left-3 flex gap-1.5 text-[11px] font-semibold text-white">
+        <span className="absolute left-3 top-3 z-[3] rounded-full bg-black/45 px-3 py-1 text-[11px] font-bold tracking-wide text-white backdrop-blur-md">{CATEGORY_LABEL[p.category] ?? p.category}</span>
+        <div className="absolute bottom-3 left-3 z-[3] flex gap-1.5 text-[11px] font-semibold text-white">
           <span className="inline-flex items-center gap-1 rounded-full bg-black/45 px-2.5 py-1 backdrop-blur-md"><Icon name="clock" className="size-3" />{p.duration_min} mnt</span>
           <span className="inline-flex items-center gap-1 rounded-full bg-black/45 px-2.5 py-1 backdrop-blur-md"><Icon name="users" className="size-3" />maks {p.max_people}</span>
         </div>

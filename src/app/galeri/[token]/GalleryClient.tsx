@@ -41,6 +41,7 @@ function Tile({ f, i, fav, selecting, selected, dlHref, onFav, onOpen, onToggle,
   const [ok, setOk] = useState(false);
   const [err, setErr] = useState(0);
   const [bust, setBust] = useState(0);
+  const [dling, setDling] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const long = useRef(false);
   const start = () => { long.current = false; timer.current = setTimeout(() => { long.current = true; onLong(); }, 520); };
@@ -79,8 +80,8 @@ function Tile({ f, i, fav, selecting, selected, dlHref, onFav, onOpen, onToggle,
         <div className="absolute inset-x-0 bottom-0 flex items-center justify-between p-2.5 opacity-100 transition duration-300 sm:translate-y-2 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100">
           <button type="button" onClick={onFav} aria-pressed={fav} aria-label={fav ? "Lepas favorit" : "Tandai favorit"}
             className={`grid size-9 place-items-center rounded-full backdrop-blur transition active:scale-75 ${fav ? "bg-[#ff3b6b] text-white" : "bg-black/45 text-white hover:bg-black/65"}`}><Heart on={fav} className="size-[18px]" /></button>
-          <a href={dlHref} download onClick={() => onDl(f.title)} aria-label={`Unduh ${f.title}`}
-            className="grid size-9 place-items-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/65 active:scale-90"><Ico d={I.dl} className="size-[18px]" /></a>
+          <a href={dlHref} download onClick={() => { onDl(f.title); setDling(true); setTimeout(() => setDling(false), 2500); }} aria-label={`Unduh ${f.title}`} aria-busy={dling}
+            className="grid size-9 place-items-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/65 active:scale-90">{dling ? <span className="spinner" /> : <Ico d={I.dl} className="size-[18px]" />}</a>
         </div>
       </>)}
     </div>
@@ -94,6 +95,7 @@ export default function GalleryClient({ token, g }: { token: string; g: Gallery 
   const [slide, setSlide] = useState(false);
   const [zoom, setZoom] = useState(false);
   const [imgOk, setImgOk] = useState(false);
+  const [lbDl, setLbDl] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [notice, setNotice] = useState<{ text: string; tone: "ok" | "bad" | "busy" } | null>(null);
@@ -341,7 +343,7 @@ export default function GalleryClient({ token, g }: { token: string; g: Gallery 
               <button className="grid size-10 place-items-center rounded-full bg-white/10 transition hover:bg-white/20 active:scale-90" onClick={() => setSlide((s) => !s)} aria-label={slide ? "Hentikan slideshow" : "Putar slideshow"}><Ico d={slide ? I.pause : I.play} className="size-[18px]" /></button>
               {!cur.video && <button className={`grid size-10 place-items-center rounded-full transition active:scale-90 ${zoom ? "bg-accent" : "bg-white/10 hover:bg-white/20"}`} onClick={() => setZoom((z) => !z)} aria-label="Perbesar"><Ico d={I.zoom} className="size-[18px]" /></button>}
               <button className={`grid size-10 place-items-center rounded-full transition active:scale-75 ${favs.has(cur.id) ? "bg-[#ff3b6b]" : "bg-white/10 hover:bg-white/20"}`} onClick={() => toggleFav(cur.id)} aria-pressed={favs.has(cur.id)} aria-label="Favorit"><Heart on={favs.has(cur.id)} className="size-[18px]" /></button>
-              <a className="grid size-10 place-items-center rounded-full bg-white/10 transition hover:bg-white/20 active:scale-90" href={dlOne(cur.id)} download onClick={() => dlSingle(cur.title)} aria-label="Unduh"><Ico d={I.dl} className="size-[18px]" /></a>
+              <a className="grid size-10 place-items-center rounded-full bg-white/10 transition hover:bg-white/20 active:scale-90" href={dlOne(cur.id)} download onClick={() => { dlSingle(cur.title); setLbDl(true); setTimeout(() => setLbDl(false), 2500); }} aria-label="Unduh" aria-busy={lbDl}>{lbDl ? <span className="spinner" /> : <Ico d={I.dl} className="size-[18px]" />}</a>
               <button className="grid size-10 place-items-center rounded-full bg-white/10 transition hover:bg-white/20 active:scale-90" onClick={share} aria-label="Bagikan"><Ico d={I.share} className="size-[18px]" /></button>
               <button className="grid size-10 place-items-center rounded-full bg-white/10 transition hover:bg-white/20 active:scale-90" onClick={close} aria-label="Tutup"><Ico d={I.x} className="size-[18px]" /></button>
             </div>

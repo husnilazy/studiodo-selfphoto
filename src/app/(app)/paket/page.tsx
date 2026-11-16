@@ -7,15 +7,15 @@ import { q } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { storageReady } from "@/lib/siteServer";
 import PackageImageEditor from "@/components/PackageImageEditor";
+import PackageManager, { type PkgItem } from "./PackageManager";
 import ImageUploadField from "@/components/ImageUploadField";
 import { CATEGORY_LABEL, rupiah } from "@/lib/format";
-import { imageStyle, priceSuffix } from "@/lib/packageUtils";
 import { imageSrc } from "@/lib/siteConfig";
 import { deleteCatalog, saveAddon, savePackage, saveRoom } from "@/app/actions/catalog";
 
 export const metadata = { title: "Paket & Ruang" };
 
-type Pkg = { image_size: string; image_fit: string; image_x: number; image_y: number; per_person: boolean; bookable_online: boolean; option_label: string; options: string; room_ids: number[]; image_url: string; id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; active: boolean };
+type Pkg = { images: string[]; image_size: string; image_fit: string; image_x: number; image_y: number; per_person: boolean; bookable_online: boolean; option_label: string; options: string; room_ids: number[]; image_url: string; id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; active: boolean };
 type Room = { image_url: string; id: number; name: string; color: string; description: string; active: boolean };
 type Addon = { id: number; name: string; price: number; active: boolean };
 
@@ -39,39 +39,15 @@ export default async function PaketPage({ searchParams }: { searchParams: Promis
       ]} />
 
       {tab === "paket" && (
-        <section>
-          <div className="mb-4 flex justify-end">
-            <Sheet title="Paket Baru" wide trigger={<button className="btn btn-primary"><Icon name="plus" className="size-4" /> Tambah Paket</button>}>
-              <PackageForm rooms={rooms} storage={storage} />
-            </Sheet>
-          </div>
-          {pkgs.length === 0 ? <Empty title="Belum ada paket" hint="Tambahkan paket pertama, mis. Self Photo 30 menit." /> : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {pkgs.map((p, i) => (
-                <Sheet key={p.id} title="Edit Paket" wide trigger={
-                  <button className={`card hover-lift anim-rise overflow-hidden text-left active:scale-[.98] ${p.active ? "" : "opacity-55"}`} style={{ ["--i" as string]: Math.min(i, 8) }}>
-                    {p.image_url && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={imageSrc(p.image_url)} alt="" loading="lazy" style={imageStyle(p)} className="h-28 w-full bg-panel2" />
-                    )}
-                    <div className="p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <Badge tone="indigo">{CATEGORY_LABEL[p.category]}</Badge>
-                      {!p.active && <Badge>Nonaktif</Badge>}
-                    </div>
-                    <p className="font-display mt-2 text-lg font-semibold leading-tight">{p.name}</p>
-                    <p className="font-display tnum mt-1 text-xl font-bold text-accent">{rupiah(p.price)} <span className="text-sm font-semibold text-muted">{priceSuffix(p)}</span></p>
-                    {!p.bookable_online && <p className="mt-1 text-xs font-semibold text-warn">Walk-in saja (tanpa booking online)</p>}
-                    <p className="mt-1 text-xs text-muted">{p.duration_min} menit · maks {p.max_people} orang</p>
-                    {p.includes && <p className="mt-2 line-clamp-2 text-xs text-muted">{p.includes}</p>}
-                    </div>
-                  </button>}>
-                  <PackageForm pkg={p} rooms={rooms} storage={storage} />
-                </Sheet>
-              ))}
-            </div>
-          )}
-        </section>
+        <PackageManager
+          items={pkgs.map((p): PkgItem => ({
+            id: p.id, name: p.name, category: p.category, price: Number(p.price), per_person: p.per_person, duration_min: p.duration_min, max_people: p.max_people,
+            active: p.active, bookable_online: p.bookable_online, image_url: p.image_url, images: Array.isArray(p.images) ? p.images : [], image_fit: p.image_fit,
+            image_x: p.image_x, image_y: p.image_y, includes: p.includes ?? "", room_count: p.room_ids.length, option_label: p.option_label ?? "",
+          }))}
+          editors={Object.fromEntries(pkgs.map((p) => [p.id, <PackageForm key={p.id} pkg={p} rooms={rooms} storage={storage} />]))}
+          createEditor={<PackageForm rooms={rooms} storage={storage} />}
+        />
       )}
 
       {tab === "ruang" && (
@@ -143,53 +119,86 @@ function DeleteRow({ table, id }: { table: "packages" | "rooms" | "addons"; id: 
   );
 }
 
+function Section({ n, title, hint, children }: { n: number; title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3 rounded-2xl border border-line p-3.5">
+      <div>
+        <h3 className="font-display flex items-center gap-2 text-sm font-semibold"><span className="grid size-5 place-items-center rounded-full bg-accentsoft text-[11px] text-accent">{n}</span>{title}</h3>
+        {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Toggle({ name, on, title, desc }: { name: string; on: boolean; title: string; desc: string }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 transition hover:border-accent has-[:checked]:border-accent has-[:checked]:bg-accentsoft">
+      <input type="checkbox" name={name} defaultChecked={on} className="mt-0.5 size-5 shrink-0 accent-[var(--accent)]" />
+      <span><span className="block text-sm font-semibold">{title}</span><span className="block text-xs text-muted">{desc}</span></span>
+    </label>
+  );
+}
+
 function PackageForm({ pkg, rooms, storage }: { pkg?: Pkg; rooms: Room[]; storage: boolean }) {
   return (
     <>
-      <ActionForm action={savePackage.bind(null, pkg?.id ?? null)}>
-        <Field label="Nama paket"><input name="name" className="input" required defaultValue={pkg?.name} placeholder="mis. Self Photo Basic" /></Field>
-        <div className="grid grid-cols-2 gap-3">
+      <ActionForm action={savePackage.bind(null, pkg?.id ?? null)} submit={pkg ? "Simpan perubahan" : "Buat paket"}>
+        <Section n={1} title="Informasi paket" hint="Yang dilihat customer di website dan saat booking.">
+          <Field label="Nama paket"><input name="name" className="input" required defaultValue={pkg?.name} placeholder="mis. Self Photo Basic" /></Field>
           <Field label="Kategori">
             <select name="category" className="input" defaultValue={pkg?.category ?? "self_photo"}>
               {Object.entries(CATEGORY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </Field>
-          <Field label="Harga"><MoneyInput name="price" defaultValue={pkg?.price} required /></Field>
-          <Field label="Dihitung">
-            <select name="pricing" className="input" defaultValue={pkg?.per_person ? "per_person" : "per_sesi"}>
-              <option value="per_sesi">Per sesi / paket</option>
-              <option value="per_person">Per orang (× jumlah orang)</option>
-            </select>
-          </Field>
-          <Field label="Durasi (menit)"><input name="duration_min" inputMode="numeric" className="input" required defaultValue={pkg?.duration_min ?? 30} /></Field>
-          <Field label="Maks. orang"><input name="max_people" inputMode="numeric" className="input" defaultValue={pkg?.max_people ?? 2} /></Field>
-        </div>
-        <Field label="Termasuk (opsional)"><textarea name="includes" className="input" defaultValue={pkg?.includes} placeholder="mis. 1 cetak 4R, semua soft file" /></Field>
-        <Field label="Deskripsi (opsional, tampil di website)"><textarea name="description" className="input" defaultValue={pkg?.description} /></Field>
-        <PackageImageEditor storage={storage} initial={{ name: pkg?.name ?? "", category: pkg?.category ?? "self_photo", description: pkg?.description ?? "", includes: pkg?.includes ?? "", price: pkg?.price ?? 0,
-          duration_min: pkg?.duration_min ?? 30, max_people: pkg?.max_people ?? 2, per_person: pkg?.per_person ?? false,
-          image_url: pkg?.image_url ?? "", image_size: pkg?.image_size ?? "md", image_fit: pkg?.image_fit ?? "cover", image_x: pkg?.image_x ?? 50, image_y: pkg?.image_y ?? 50 }} />
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Nama pilihan (opsional)" hint="mis. Warna background, Tema"><input name="option_label" className="input" defaultValue={pkg?.option_label} placeholder="Warna background" /></Field>
-          <Field label="Daftar pilihan" hint="Satu per baris"><textarea name="options" className="input !min-h-[4.5rem]" defaultValue={pkg?.options} placeholder={"Soft Pink\nAesthetic Beige\nWarm Grey"} /></Field>
-        </div>
-        {rooms.length > 0 && (
-          <fieldset>
-            <legend className="label">Boleh dipakai di ruang (kosong = semua ruang)</legend>
-            <div className="flex flex-wrap gap-2">
-              {rooms.filter((r) => r.active || pkg?.room_ids.includes(r.id)).map((r) => (
-                <label key={r.id} className="chip cursor-pointer gap-2 has-[:checked]:!border-transparent has-[:checked]:!bg-accent has-[:checked]:!text-accentfg">
-                  <input type="checkbox" name="room_ids" value={r.id} defaultChecked={pkg?.room_ids.includes(r.id)} className="sr-only" />
-                  <span className="size-2.5 rounded-full" style={{ background: r.color }} />{r.name}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        )}
-        <label className="flex items-center gap-2 text-sm font-semibold">
-          <input type="checkbox" name="bookable_online" defaultChecked={pkg?.bookable_online ?? true} className="size-5 accent-[var(--accent)]" /> Bisa dipesan online (hilangkan centang untuk paket walk-in saja)
-        </label>
-        <ActiveToggle on={pkg?.active ?? true} />
+          <Field label="Termasuk (poin-poin di kartu)" hint="Satu poin per baris, mis. “1 cetak 4R”, “Semua soft file”."><textarea name="includes" className="input" rows={3} defaultValue={pkg?.includes} placeholder={"1 cetak 4R\nSemua soft file"} /></Field>
+          <Field label="Deskripsi singkat (opsional)"><textarea name="description" className="input" rows={2} defaultValue={pkg?.description} /></Field>
+        </Section>
+
+        <Section n={2} title="Harga & durasi">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Harga"><MoneyInput name="price" defaultValue={pkg?.price} required /></Field>
+            <Field label="Dihitung">
+              <select name="pricing" className="input" defaultValue={pkg?.per_person ? "per_person" : "per_sesi"}>
+                <option value="per_sesi">Per sesi / paket</option>
+                <option value="per_person">Per orang (× jumlah orang)</option>
+              </select>
+            </Field>
+            <Field label="Durasi (menit)"><input name="duration_min" inputMode="numeric" className="input" required defaultValue={pkg?.duration_min ?? 30} /></Field>
+            <Field label="Maks. orang"><input name="max_people" inputMode="numeric" className="input" defaultValue={pkg?.max_people ?? 2} /></Field>
+          </div>
+        </Section>
+
+        <Section n={3} title="Foto" hint="Tambah beberapa foto: kartu paket akan menampilkannya sebagai slide otomatis.">
+          <PackageImageEditor storage={storage} initial={{ name: pkg?.name ?? "", category: pkg?.category ?? "self_photo", description: pkg?.description ?? "", includes: pkg?.includes ?? "", price: pkg?.price ?? 0,
+            duration_min: pkg?.duration_min ?? 30, max_people: pkg?.max_people ?? 2, per_person: pkg?.per_person ?? false,
+            image_url: pkg?.image_url ?? "", images: Array.isArray(pkg?.images) ? pkg.images : [], image_size: pkg?.image_size ?? "md", image_fit: pkg?.image_fit ?? "cover", image_x: pkg?.image_x ?? 50, image_y: pkg?.image_y ?? 50 }} />
+        </Section>
+
+        <Section n={4} title="Pilihan varian (opsional)" hint="Mis. customer memilih warna background atau tema saat booking.">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Nama pilihan"><input name="option_label" className="input" defaultValue={pkg?.option_label} placeholder="Warna background" /></Field>
+            <Field label="Daftar pilihan" hint="Satu per baris"><textarea name="options" className="input !min-h-[4.5rem]" defaultValue={pkg?.options} placeholder={"Soft Pink\nAesthetic Beige\nWarm Grey"} /></Field>
+          </div>
+        </Section>
+
+        <Section n={5} title="Ketersediaan" hint="Kapan dan di mana paket ini bisa dipakai.">
+          {rooms.length > 0 && (
+            <fieldset>
+              <legend className="label">Boleh dipakai di ruang (kosong = semua ruang)</legend>
+              <div className="flex flex-wrap gap-2">
+                {rooms.filter((r) => r.active || pkg?.room_ids.includes(r.id)).map((r) => (
+                  <label key={r.id} className="chip cursor-pointer gap-2 has-[:checked]:!border-transparent has-[:checked]:!bg-accent has-[:checked]:!text-accentfg">
+                    <input type="checkbox" name="room_ids" value={r.id} defaultChecked={pkg?.room_ids.includes(r.id)} className="sr-only" />
+                    <span className="size-2.5 rounded-full" style={{ background: r.color }} />{r.name}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+          <Toggle name="bookable_online" on={pkg?.bookable_online ?? true} title="Bisa dipesan online" desc="Matikan untuk paket walk-in saja: tampil di website tanpa tombol Pilih." />
+          <Toggle name="active" on={pkg?.active ?? true} title="Aktif" desc="Nonaktif = disembunyikan dari website dan pilihan booking (data lama tetap aman)." />
+        </Section>
       </ActionForm>
       {pkg && <DeleteRow table="packages" id={pkg.id} />}
     </>

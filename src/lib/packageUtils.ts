@@ -20,7 +20,10 @@ export const roomAllowed = (p: Pick<PackageRule, "room_ids">, roomId: number | n
   p.room_ids.length === 0 || (roomId !== null && p.room_ids.includes(roomId));
 
 /** Tampilan foto kartu paket (diatur dari admin, dipakai kartu admin, pratinjau, dan landing page). */
-export type PackageImage = { image_url: string; image_size?: string; image_fit?: string; image_x?: number; image_y?: number };
+export type PackageImage = { image_url: string; images?: string[]; image_size?: string; image_fit?: string; image_x?: number; image_y?: number };
+/** Semua foto paket berurutan: sampul dulu, lalu foto tambahan. */
+export const packageImages = (p: Pick<PackageImage, "image_url" | "images">): string[] =>
+  [p.image_url, ...(Array.isArray(p.images) ? p.images : [])].filter((u): u is string => typeof u === "string" && u.length > 0);
 export const IMAGE_SIZES = { sm: { label: "Kecil", h: 132 }, md: { label: "Sedang", h: 184 }, lg: { label: "Besar", h: 248 } } as const;
 export type ImageSize = keyof typeof IMAGE_SIZES;
 export const imageSizeKey = (s?: string): ImageSize => (s === "sm" || s === "lg" ? s : "md");
