@@ -59,7 +59,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <p className="text-sm font-semibold text-muted">{fmtDate(today, { weekday: true })}</p>
           <h1 className="font-serif-ui text-3xl sm:text-4xl">{greet}, <span className="text-accent">{user.name}</span></h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/live" className="btn"><Icon name="clock" className="size-4" /> Sesi Live</Link>
           <Link href="/booking/baru" className="btn btn-primary"><Icon name="plus" className="size-4" /> Walk-in</Link>
           <Link href="/booking/baru?mode=booking" className="btn"><Icon name="calendar" className="size-4" /> Booking</Link>
