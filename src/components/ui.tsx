@@ -32,7 +32,7 @@ export function Stat({
   return (
     <div className="card hover-lift anim-rise p-4" style={{ ["--i" as string]: i }}>
       <div className="flex items-center justify-between gap-2">
-        <p className="font-mono-ui text-[11px] font-medium uppercase tracking-[.08em] text-muted">{label}</p>
+        <p className="font-mono-ui text-[11px] uppercase text-muted">{label}</p>
         {icon && <span className="grid size-8 place-items-center rounded-xl bg-accentsoft text-accent"><Icon name={icon} className="size-4" /></span>}
       </div>
       <p className={`font-serif-ui tnum mt-1 text-3xl sm:text-4xl ${color}`}>{typeof value === "string" || typeof value === "number" ? <CountUp value={String(value)} /> : value}</p>

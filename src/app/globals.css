@@ -49,19 +49,19 @@
   --color-warnsoft: var(--warn-soft);
   --color-bad: var(--bad);
   --color-badsoft: var(--bad-soft);
-  --font-sans: var(--font-dm), var(--font-jakarta), system-ui, sans-serif;
-  --font-serif-ui: var(--font-instrument), Georgia, serif;
-  --font-mono-ui: var(--font-plexmono), ui-monospace, monospace;
-  --font-display: var(--font-sora), system-ui, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", var(--font-inter), "Segoe UI", system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", var(--font-inter), "Segoe UI", system-ui, sans-serif;
 }
 
 html { color-scheme: light dark; -webkit-tap-highlight-color: transparent; }
-body { background: var(--bg); color: var(--fg); font-family: var(--font-dm), var(--font-jakarta), system-ui, sans-serif; overflow-x: hidden; }
+body { background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", var(--font-inter), "Segoe UI", system-ui, sans-serif; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+/* Situs publik (landing & booking online) tetap memakai font brand-nya */
 .site { font-family: var(--font-jakarta), system-ui, sans-serif; }
+.site .font-display { font-family: var(--font-sora), system-ui, sans-serif; }
 
-/* Tipografi editorial untuk aplikasi: serif untuk judul & angka besar, mono kecil untuk label teknis */
-.font-serif-ui { font-family: var(--font-instrument), Georgia, serif; font-weight: 400 !important; letter-spacing: -.015em; }
-.font-mono-ui { font-family: var(--font-plexmono), ui-monospace, monospace; }
+/* Tipografi ala Apple (San Francisco; Inter di perangkat non-Apple): judul tebal-rapat, label kecil huruf besar */
+.font-serif-ui { font-weight: 700 !important; letter-spacing: -.03em; }
+.font-mono-ui { font-weight: 600; letter-spacing: .04em; }
 * { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 .tnum { font-variant-numeric: tabular-nums; }
 
@@ -83,7 +83,7 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-dm), var
     background: var(--panel); color: var(--fg); font-size: 16px; outline: none; transition: border-color .15s, box-shadow .15s; }
   .input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
   textarea.input { min-height: 5rem; resize: vertical; }
-  .label { display: block; font-family: var(--font-plexmono), ui-monospace, monospace; font-size: .68rem; font-weight: 500; text-transform: uppercase; color: var(--muted); margin-bottom: .35rem; letter-spacing: .08em; }
+  .label { display: block; font-size: .7rem; font-weight: 600; text-transform: uppercase; color: var(--muted); margin-bottom: .35rem; letter-spacing: .04em; }
   .badge { display: inline-flex; align-items: center; gap: .3rem; padding: .15rem .55rem; border-radius: 999px; font-size: .7rem; font-weight: 700; white-space: nowrap; }
   .badge-green { background: var(--ok-soft); color: var(--ok); }
   .badge-amber { background: var(--warn-soft); color: var(--warn); }
@@ -95,7 +95,7 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-dm), var
   .chip[data-on="true"] { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
   .chip:disabled { opacity: .35; pointer-events: none; text-decoration: line-through; }
   .table { width: 100%; border-collapse: collapse; font-size: .875rem; }
-  .table th { text-align: left; font-family: var(--font-plexmono), ui-monospace, monospace; font-weight: 500; font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: .6rem .8rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .table th { text-align: left; font-weight: 600; font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: .6rem .8rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
   .table td { padding: .7rem .8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
   .table tr:last-child td { border-bottom: 0; }
   .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
