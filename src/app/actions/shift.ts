@@ -25,15 +25,18 @@ export async function openShift(_p: ActionState, fd: FormData) {
         throw new Error("Shift baru saja dibuka dari perangkat lain.");
       }
       // Samakan saldo Kas di buku dengan uang yang benar-benar ada di laci saat ini:
-      // modal laci yang belum pernah dijurnal dicatat sebagai setoran modal, uang yang diambil pemilik sebagai prive.
+      // modal laci yang belum pernah dijurnal dicatat sebagai setoran modal; kekurangan dicatat sebagai beban "Selisih Kas"
+      // (bukan prive, supaya laporan tidak seolah-olah pemilik mengambil uang). Prive tetap lewat menu Kas manual.
+      await q(`insert into accounts (code, name, type, subtype, cf_category, is_system, sort)
+               values ('5110','Selisih Kas','expense','opex','operating',true,59) on conflict (code) do nothing`);
       const [bal] = await q<{ b: number }>(
         `select coalesce(sum(l.debit - l.credit),0) as b from journal_lines l join journals j on j.id = l.journal_id
           join accounts a on a.id = l.account_id where a.code = '1101' and not j.voided`);
       const gap = cash - Number(bal.b);
       if (gap !== 0) {
         await postJournal(q, {
-          date: todayWIB(), memo: `Penyesuaian kas laci saat buka shift #${sh.id} (${gap > 0 ? "modal laci" : "uang diambil pemilik"})`, refType: "cash", userId: user.id,
-          lines: gap > 0 ? [{ account: "1101", debit: gap }, { account: "3101", credit: gap }] : [{ account: "3201", debit: -gap }, { account: "1101", credit: -gap }],
+          date: todayWIB(), memo: `Penyesuaian kas laci saat buka shift #${sh.id} (${gap > 0 ? "modal laci" : "selisih kurang, perlu dicek"})`, refType: "cash", userId: user.id,
+          lines: gap > 0 ? [{ account: "1101", debit: gap }, { account: "3101", credit: gap }] : [{ account: "5110", debit: -gap }, { account: "1101", credit: -gap }],
         });
       }
     });
@@ -86,12 +89,12 @@ export async function closeShift(_p: ActionState, fd: FormData) {
       if (diff !== 0 && !note) throw new Error(`Ada selisih ${rupiah(diff)}. Tulis catatan penyebabnya.`);
       let jid: number | null = null;
       if (diff !== 0) {
-        // Samakan saldo Kas di buku dengan uang fisik: lebih → pendapatan lain, kurang → beban lain-lain.
+        // Samakan saldo Kas di buku dengan uang fisik: lebih → pendapatan lain, kurang → Selisih Kas.
         jid = await postJournal(q, {
           date: todayWIB(), memo: `Selisih kas shift #${sh.id} (${diff > 0 ? "lebih" : "kurang"})`, refType: "cash", userId: user.id,
           lines: diff > 0
             ? [{ account: "1101", debit: diff }, { account: "4105", credit: diff }]
-            : [{ account: "5109", debit: -diff }, { account: "1101", credit: -diff }],
+            : [{ account: "5110", debit: -diff }, { account: "1101", credit: -diff }],
         });
       }
       await q(

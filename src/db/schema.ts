@@ -436,6 +436,7 @@ insert into accounts (code, name, type, subtype, cf_category, is_system, sort) v
  ('5107','Biaya Admin Bank & QRIS','expense','opex','operating',false,57),
  ('5108','Transport','expense','opex','operating',false,58),
  ('5109','Beban Lain-lain','expense','opex','operating',false,59),
+ ('5110','Selisih Kas','expense','opex','operating',true,59),
  ('5190','Beban Penyusutan','expense','depr','operating',true,60)
 on conflict (code) do nothing;
 
