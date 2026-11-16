@@ -169,7 +169,7 @@ export default async function BookingDetail({ params }: { params: Promise<{ id: 
           <h2 className="font-display font-semibold">File Customer</h2>
           <div className="flex gap-2">
           <Sheet title="Upload ke Google Drive" trigger={<button className="btn btn-sm btn-primary"><Icon name="download" className="size-4 rotate-180" /> Upload</button>}>
-            <DriveUploader customerId={b.customer_id} bookingId={b.id} connected={driveOn} />
+            <DriveUploader customerId={b.customer_id} bookingId={b.id} customerName={b.customer_name} customerPhone={b.customer_phone} connected={driveOn} />
           </Sheet>
           <Sheet title="Tambah Link File" trigger={<button className="btn btn-sm"><Icon name="plus" className="size-4" /> Link</button>}>
             <FileForm customerId={b.customer_id} bookingId={b.id} bookings={[{ id: b.id, label: `${b.code} · ${fmtDate(day, { short: true })}` }]} />

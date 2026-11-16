@@ -58,6 +58,33 @@ export async function finishDriveUpload(t: Target, fileId: string, kind: string)
   }
 }
 
+/** Otomatis setelah upload: buka folder sebagai link, catat sebagai "Album" (sekali saja), kembalikan URL-nya. */
+export async function autoShareFolder(t: Target): Promise<{ ok: true; url: string; title: string } | { ok: false; error: string }> {
+  try {
+    const user = await actionUser();
+    const folder = await resolveFolder(t);
+    await shareAnyone(folder);
+    const url = await folderLink(folder);
+    const [c] = await q<{ name: string }>("select name from customers where id = $1", [t.customerId]);
+    let title = `Folder ${c.name}`;
+    if (t.bookingId) {
+      const [b] = await q<{ code: string }>("select code from bookings where id = $1", [t.bookingId]);
+      title = `Folder sesi ${b.code}`;
+    }
+    const exists = await q("select 1 from customer_files where customer_id = $1 and url = $2", [t.customerId, url]);
+    if (!exists.length) {
+      await q("insert into customer_files (customer_id, booking_id, title, url, kind, status, created_by) values ($1,$2,$3,$4,'album','siap',$5)",
+        [t.customerId, t.bookingId, title, url, user.id]);
+    }
+    revalidatePath("/file");
+    revalidatePath(`/customer/${t.customerId}`);
+    if (t.bookingId) revalidatePath(`/booking/${t.bookingId}`);
+    return { ok: true, url, title };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Gagal membuat link folder." };
+  }
+}
+
 /** Membuka folder (customer atau sesi) sebagai link & mencatatnya sebagai item "Album" agar bisa dikirim lewat WhatsApp. */
 export async function shareDriveFolder(t: Target, _p: ActionState, _fd: FormData) {
   return safe(async () => {

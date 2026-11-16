@@ -3,6 +3,8 @@ import Icon from "@/components/Icon";
 import Sheet from "@/components/Sheet";
 import FileForm from "@/components/FileForm";
 import FileList, { type FileItem } from "@/components/FileList";
+import FileUploadSheet from "@/components/FileUploadSheet";
+import { getConfig } from "@/lib/gdrive";
 import { Empty, PageHeader } from "@/components/ui";
 import { q } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -13,6 +15,7 @@ export const metadata = { title: "File Customer" };
 export default async function FilePage({ searchParams }: { searchParams: Promise<{ status?: string; q?: string }> }) {
   await requireUser();
   const sp = await searchParams;
+  const driveOn = !!(await getConfig());
   const status = sp.status && FILE_STATUS_LABEL[sp.status] ? sp.status : "";
   const term = (sp.q ?? "").trim();
   const files = await q<FileItem>(
@@ -33,10 +36,20 @@ export default async function FilePage({ searchParams }: { searchParams: Promise
     <>
       <PageHeader title="File Customer" subtitle="Link foto & video hasil sesi, status pengerjaan, dan pengiriman ke customer."
         actions={
-          <Sheet title="Tambah File" trigger={<button className="btn btn-primary"><Icon name="plus" className="size-4" /> Tambah File</button>}>
-            <FileForm />
-          </Sheet>
+          <>
+            <Sheet wide title="Upload ke Google Drive" trigger={<button className="btn btn-primary"><Icon name="download" className="size-4 rotate-180" /> Upload ke Drive</button>}>
+              <FileUploadSheet connected={driveOn} />
+            </Sheet>
+            <Sheet title="Tambah File" trigger={<button className="btn"><Icon name="plus" className="size-4" /> Link manual</button>}>
+              <FileForm />
+            </Sheet>
+          </>
         } />
+      {!driveOn && (
+        <p className="mb-4 rounded-xl border border-warn/30 bg-warnsoft px-4 py-3 text-sm font-medium text-warn">
+          Google Drive belum terhubung. Owner bisa menghubungkannya sekali di <Link href="/pengaturan" className="font-bold underline">Pengaturan → Google Drive</Link>, setelah itu foto/video bisa diunggah langsung dari sini dengan folder dan link otomatis.
+        </p>
+      )}
       <form className="mb-4 flex flex-wrap gap-2">
         <div className="relative min-w-0 flex-1 basis-56">
           <Icon name="search" className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />

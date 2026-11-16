@@ -1,10 +1,14 @@
 "use client";
+import { useState } from "react";
 import Icon from "./Icon";
+import { toast } from "./Toaster";
 
 /** Mengunduh semua tabel di dalam #report sebagai CSV (dibuka mulus di Excel / Google Sheets). */
 export default function ExportCsv({ name }: { name: string }) {
+  const [busy, setBusy] = useState(false);
   return (
-    <button className="btn btn-sm" onClick={() => {
+    <button className="btn btn-sm" disabled={busy} onClick={() => {
+      setBusy(true);
       const out: string[] = [];
       document.querySelectorAll("#report table").forEach((t) => {
         t.querySelectorAll("tr").forEach((tr) => {
@@ -19,8 +23,10 @@ export default function ExportCsv({ name }: { name: string }) {
       a.download = `${name}.csv`;
       a.click();
       URL.revokeObjectURL(a.href);
+      toast(`${name}.csv diunduh`);
+      setTimeout(() => setBusy(false), 700);
     }}>
-      <Icon name="download" className="size-4" /> CSV
+      {busy ? <span className="spinner" /> : <Icon name="download" className="size-4" />} {busy ? "Menyiapkan…" : "CSV"}
     </button>
   );
 }

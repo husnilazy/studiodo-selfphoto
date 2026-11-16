@@ -68,7 +68,7 @@ export default async function CustomerDetail({ params }: { params: Promise<{ id:
         <h2 className="font-display font-semibold">File</h2>
         <div className="flex gap-2">
         <Sheet title="Upload ke Google Drive" trigger={<button className="btn btn-sm btn-primary"><Icon name="download" className="size-4 rotate-180" /> Upload</button>}>
-          <DriveUploader customerId={c.id} connected={driveOn} bookings={bookings.map((b) => ({ id: b.id, label: `${b.code} · ${fmtDate(dateWIB(b.start_at), { short: true })}` }))} />
+          <DriveUploader customerId={c.id} customerName={c.name} customerPhone={c.phone} connected={driveOn} bookings={bookings.map((b) => ({ id: b.id, label: `${b.code} · ${fmtDate(dateWIB(b.start_at), { short: true })}` }))} />
         </Sheet>
         <Sheet title="Tambah Link File" trigger={<button className="btn btn-sm"><Icon name="plus" className="size-4" /> Link</button>}>
           <FileForm customerId={c.id} bookings={bookings.map((b) => ({ id: b.id, label: `${b.code} · ${fmtDate(dateWIB(b.start_at), { short: true })}` }))} />

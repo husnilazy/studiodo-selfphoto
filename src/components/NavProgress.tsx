@@ -21,8 +21,15 @@ function Bar() {
       stop(); setOn(true); setW(12);
       timer.current = setInterval(() => setW((v) => v + (90 - v) * 0.08), 140);
     };
+    const onSubmit = (e: SubmitEvent) => {
+      const f = e.target as HTMLFormElement | null;
+      if (e.defaultPrevented || !f || f.method?.toLowerCase() !== "get" || f.target === "_blank") return;
+      stop(); setOn(true); setW(12);
+      timer.current = setInterval(() => setW((v) => v + (90 - v) * 0.08), 140);
+    };
     document.addEventListener("click", onClick);
-    return () => { document.removeEventListener("click", onClick); stop(); };
+    document.addEventListener("submit", onSubmit);
+    return () => { document.removeEventListener("click", onClick); document.removeEventListener("submit", onSubmit); stop(); };
   }, []);
 
   useEffect(() => {
