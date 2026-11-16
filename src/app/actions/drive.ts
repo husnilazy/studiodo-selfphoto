@@ -46,9 +46,9 @@ export async function finishDriveUpload(t: Target, fileId: string, kind: string)
     await shareAnyone(fileId);
     const status = kind === "foto_asli" || kind === "lainnya" ? "proses" : "siap";
     await q(
-      `insert into customer_files (customer_id, booking_id, title, url, kind, status, drive_file_id, created_by)
-       values ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [t.customerId, t.bookingId, info.name, info.webViewLink ?? `https://drive.google.com/file/d/${fileId}/view`, kind, status, fileId, user.id]);
+      `insert into customer_files (customer_id, booking_id, title, url, kind, status, drive_file_id, mime, created_by)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [t.customerId, t.bookingId, info.name, info.webViewLink ?? `https://drive.google.com/file/d/${fileId}/view`, kind, status, fileId, info.mimeType ?? "", user.id]);
     revalidatePath("/file");
     revalidatePath(`/customer/${t.customerId}`);
     if (t.bookingId) revalidatePath(`/booking/${t.bookingId}`);

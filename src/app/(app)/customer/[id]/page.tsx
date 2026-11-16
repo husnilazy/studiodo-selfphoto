@@ -13,6 +13,7 @@ import { q } from "@/lib/db";
 import { listBookings } from "@/lib/data";
 import { getConfig } from "@/lib/gdrive";
 import DriveUploader from "@/components/DriveUploader";
+import GalleryPanel from "@/components/GalleryPanel";
 import { dateWIB, fmtDate, rupiah, todayWIB, waLink } from "@/lib/format";
 import CustomerForm from "../CustomerForm";
 
@@ -63,6 +64,8 @@ export default async function CustomerDetail({ params }: { params: Promise<{ id:
       <div className="mb-6 space-y-2">
         {bookings.length === 0 ? <p className="text-sm text-muted">Belum ada booking.</p> : bookings.map((b) => <BookingRow key={b.id} b={b} showDate />)}
       </div>
+
+      <GalleryPanel customerId={c.id} name={c.name} phone={c.phone} />
 
       <div className="mb-3 flex items-center justify-between">
         <h2 className="font-display font-semibold">File</h2>

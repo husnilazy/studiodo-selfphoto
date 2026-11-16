@@ -1,7 +1,7 @@
 // Skema database STUDIODO Kasir (PostgreSQL / Supabase). Idempotent: aman dijalankan berulang.
 // Semua nilai uang disimpan sebagai bigint rupiah (tanpa desimal).
 // NAIKKAN versi ini setiap kali SCHEMA diubah agar database yang sudah ada ikut ter-upgrade.
-export const SCHEMA_VERSION = "2026-10-15.3";
+export const SCHEMA_VERSION = "2026-11-16.1";
 
 export const SCHEMA = `
 create table if not exists users (
@@ -438,6 +438,29 @@ insert into accounts (code, name, type, subtype, cf_category, is_system, sort) v
  ('5109','Beban Lain-lain','expense','opex','operating',false,59),
  ('5190','Beban Penyusutan','expense','depr','operating',true,60)
 on conflict (code) do nothing;
+
+-- Galeri customer: halaman publik per customer (berbasis token), favorit & ulasan dari customer
+alter table customers add column if not exists gallery_token text;
+create unique index if not exists customers_gallery_token_idx on customers (gallery_token) where gallery_token is not null;
+alter table customers add column if not exists gallery_note text not null default '';
+alter table customer_files add column if not exists mime text not null default '';
+create table if not exists gallery_favorites (
+  id serial primary key,
+  customer_id int not null references customers(id) on delete cascade,
+  file_id int not null references customer_files(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (customer_id, file_id)
+);
+create table if not exists gallery_feedback (
+  id serial primary key,
+  customer_id int not null references customers(id) on delete cascade,
+  rating int not null check (rating between 1 and 5),
+  message text not null default '',
+  name text not null default '',
+  created_at timestamptz not null default now()
+);
+alter table gallery_favorites enable row level security;
+alter table gallery_feedback enable row level security;
 
 insert into settings (key, value) values
  ('studio', '{"name":"STUDIODO","address":"","phone":"","open":"09:00","close":"21:00","slot":30,"footer":"Terima kasih sudah berfoto di STUDIODO!"}')

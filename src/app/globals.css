@@ -405,5 +405,9 @@ nav.no-print.fixed { background: color-mix(in oklab, var(--panel) 86%, transpare
 .aurora .a2 { left: 20vw; bottom: -52vh; width: 64vw; height: 82vh; background: radial-gradient(closest-side, rgb(26 90 255 / .88), rgb(10 48 220 / .4) 58%, transparent 100%) !important; animation: aur-b 22s ease-in-out infinite alternate; }
 .aurora .a3 { right: -12vw; bottom: -44vh; width: 62vw; height: 74vh; background: radial-gradient(closest-side, rgb(16 64 250 / .72), rgb(8 36 190 / .32) 58%, transparent 100%) !important; animation: aur-c 25s ease-in-out infinite alternate; }
 
+.gal { --bg: #05050d; --panel: #0b0c18; --panel-2: #10122a; --fg: #e9eaf0; --muted: #8e93a9; --line: rgba(255,255,255,.075);
+  --accent: #3b78ff; --accent-fg: #fff; --accent-soft: rgba(42,99,255,.16); --m-card: rgba(14,15,31,.72); --m-edge: rgba(255,255,255,.075); --m-hi: rgba(255,255,255,.045); --m-lo: rgba(0,0,0,.35);
+  --m-shadow: 0 1px 2px rgba(0,0,0,.5), 0 24px 44px -28px rgba(0,0,0,.9); --m-input: rgba(255,255,255,.05); --m-btn: rgba(255,255,255,.07); --m-btn-h: rgba(255,255,255,.12); --aurora-o: 1;
+  background: var(--bg); color: var(--fg); isolation: isolate; color-scheme: dark; }
 @media (prefers-reduced-motion: reduce) { .btn, .chip, .card, .nav-link, .input { transition: none !important; } .btn:hover, .chip:hover { transform: none; } }
 @media print { .card { background: #fff !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; } }
