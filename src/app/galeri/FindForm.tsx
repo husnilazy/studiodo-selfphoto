@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { findGallery } from "@/app/actions/galleryAccess";
 
 export default function FindForm() {
@@ -9,19 +9,20 @@ export default function FindForm() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  useEffect(() => { try { const p = localStorage.getItem("sd_member_phone"); if (p) setPhone(p); } catch { /* abaikan */ } }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
     setBusy(true); setError("");
     const r = await findGallery(phone, code);
-    if (r.ok) router.push(`/galeri/${r.token}`); else { setError(r.error); setBusy(false); }
+    if (r.ok) { try { localStorage.setItem("sd_member_phone", phone); } catch { /* abaikan */ } router.push(`/galeri/${r.token}`); } else { setError(r.error); setBusy(false); }
   }
 
   return (
     <form onSubmit={submit} className="card space-y-4 p-6 text-left sm:p-7">
       <label className="block"><span className="label">Nomor WhatsApp</span>
-        <input className="input" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08xxxxxxxxxx" required />
+        <input className="input" name="username" type="tel" inputMode="tel" autoComplete="username" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08xxxxxxxxxx" required />
       </label>
       <label className="block"><span className="label">Kode booking</span>
         <input className="input font-mono uppercase tracking-widest" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="SD-261116-001" autoComplete="off" required />

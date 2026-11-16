@@ -140,3 +140,10 @@ export async function folderLink(folderId: string) {
   const r = await drive<{ webViewLink?: string }>(`files/${folderId}?fields=webViewLink`);
   return r.data.webViewLink ?? `https://drive.google.com/drive/folders/${folderId}`;
 }
+
+/** Isi file dari Drive sebagai stream (untuk unduhan lewat galeri & ZIP). */
+export async function driveMedia(fileId: string): Promise<Response> {
+  return fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, {
+    headers: { Authorization: `Bearer ${await accessToken()}` },
+  });
+}

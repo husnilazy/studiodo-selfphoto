@@ -61,3 +61,15 @@ export async function loadGallery(token: string): Promise<Gallery | null> {
     favorites: favs.map((f) => f.file_id), expires: exp, expired: !!exp && exp < todayWIB(), reviewed: (fb?.n ?? 0) > 0,
   };
 }
+
+export type DlFile = { id: number; driveId: string; title: string; mime: string };
+/** File galeri yang boleh diunduh customer ini (siap/terkirim, bukan album/folder). `ids` = subset pilihan. */
+export async function downloadableFiles(customerId: number, ids?: number[], album?: number | null): Promise<DlFile[]> {
+  const rows = await q<{ id: number; title: string; drive_file_id: string; mime: string; booking_id: number | null }>(
+    `select id, title, drive_file_id, mime, booking_id from customer_files
+      where customer_id = $1 and drive_file_id is not null and kind in ('foto_asli','foto_edit','video') and status in ('siap','terkirim')
+      order by created_at, id`, [customerId]);
+  return rows
+    .filter((r) => (ids ? ids.includes(r.id) : true) && (album === undefined || album === null ? true : (r.booking_id ?? 0) === album))
+    .map((r) => ({ id: r.id, driveId: r.drive_file_id, title: r.title, mime: r.mime }));
+}

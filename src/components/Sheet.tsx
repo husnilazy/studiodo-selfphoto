@@ -14,12 +14,26 @@ export default function Sheet({
   const [closing, setClosing] = useState(false);
   const [mounted, setMounted] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pushedAt = useRef<string | null>(null); // alamat saat dialog dibuka (bila entri riwayat didorong)
   useEffect(() => setMounted(true), []);
+
+  // Tombol Back (HP/browser) menutup dialog dulu, tidak langsung keluar dari halaman.
+  useEffect(() => {
+    if (!open) return;
+    try { history.pushState({ ...(history.state ?? {}), sheet: 1 }, ""); pushedAt.current = location.href; } catch { pushedAt.current = null; }
+    const onPop = () => { if (pushedAt.current) { pushedAt.current = null; if (timer.current) { clearTimeout(timer.current); timer.current = null; } setOpen(false); setClosing(false); } };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [open]);
 
   const close = useCallback(() => {
     if (timer.current) return;
     setClosing(true);
-    timer.current = setTimeout(() => { timer.current = null; setOpen(false); setClosing(false); }, 210);
+    timer.current = setTimeout(() => {
+      timer.current = null; setOpen(false); setClosing(false);
+      // Buang entri riwayat yang tadi didorong, kecuali halaman sudah berpindah (mis. setelah router.push)
+      if (pushedAt.current) { const same = pushedAt.current === location.href; pushedAt.current = null; if (same) { try { history.back(); } catch { /* abaikan */ } } }
+    }, 210);
   }, []);
   const ctx = useMemo(() => ({ close }), [close]);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
