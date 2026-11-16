@@ -311,3 +311,103 @@ html.theming, html.theming *, html.theming *::before, html.theming *::after { tr
 /* Editor foto */
 .editor-checker { background-color: color-mix(in oklab, var(--panel-2) 80%, var(--bg)); background-image: conic-gradient(color-mix(in oklab, var(--fg) 7%, transparent) 25%, transparent 0 50%, color-mix(in oklab, var(--fg) 7%, transparent) 0 75%, transparent 0); background-size: 18px 18px; }
 @media print { .editor-root { display: none !important; } }
+
+/* ═════════ Midnight Metallic: kartu logam-kaca ala Apple, tombol halus, input kaca ═════════ */
+:root {
+  --m-card-a: rgba(255,255,255,.96); --m-card-b: rgba(241,246,255,.78);
+  --m-edge: rgba(60,90,160,.15); --m-hi: rgba(255,255,255,.95); --m-lo: rgba(20,40,100,.06);
+  --m-shadow: 0 1px 2px rgba(20,40,100,.06), 0 22px 40px -26px rgba(23,80,200,.32);
+  --m-input: rgba(255,255,255,.7); --m-btn-a: rgba(255,255,255,.95); --m-btn-b: rgba(236,242,255,.8);
+  --m-ease: cubic-bezier(.22,1,.36,1);
+}
+:root[data-theme="dark"] {
+  --m-card-a: rgba(255,255,255,.085); --m-card-b: rgba(255,255,255,.018);
+  --m-edge: rgba(165,190,255,.17); --m-hi: rgba(255,255,255,.13); --m-lo: rgba(0,0,0,.4);
+  --m-shadow: 0 1px 2px rgba(0,0,0,.5), 0 26px 46px -26px rgba(0,0,0,.85), 0 0 0 .5px rgba(0,0,0,.5);
+  --m-input: rgba(255,255,255,.045); --m-btn-a: rgba(255,255,255,.11); --m-btn-b: rgba(255,255,255,.035);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --m-card-a: rgba(255,255,255,.085); --m-card-b: rgba(255,255,255,.018);
+    --m-edge: rgba(165,190,255,.17); --m-hi: rgba(255,255,255,.13); --m-lo: rgba(0,0,0,.4);
+    --m-shadow: 0 1px 2px rgba(0,0,0,.5), 0 26px 46px -26px rgba(0,0,0,.85), 0 0 0 .5px rgba(0,0,0,.5);
+    --m-input: rgba(255,255,255,.045); --m-btn-a: rgba(255,255,255,.11); --m-btn-b: rgba(255,255,255,.035);
+  }
+}
+
+body { font-feature-settings: "cv11", "ss03"; letter-spacing: -.011em; }
+h1, h2, h3, .font-display { letter-spacing: -.025em; }
+
+/* Kartu: lapisan kaca dengan kilau tepi atas dan bayangan dalam seperti logam disikat */
+.card {
+  background: linear-gradient(158deg, var(--m-card-a) 0%, var(--m-card-b) 46%, transparent 100%), color-mix(in oklab, var(--panel) 64%, transparent);
+  border: 1px solid var(--m-edge);
+  box-shadow: inset 0 1px 0 var(--m-hi), inset 0 -1px 0 var(--m-lo), var(--m-shadow);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5); backdrop-filter: blur(22px) saturate(1.5);
+  transition: box-shadow .4s var(--m-ease), border-color .3s ease, transform .4s var(--m-ease);
+}
+.hover-lift:hover { transform: translateY(-3px); border-color: rgba(120,165,255,.4); box-shadow: inset 0 1px 0 var(--m-hi), inset 0 -1px 0 var(--m-lo), 0 22px 44px -22px rgba(23,105,255,.55), var(--m-shadow); }
+
+/* Tombol: halus (pegas ringan), logam-kaca; utama = biru elektrik bergradasi + kilau */
+.btn {
+  background: linear-gradient(180deg, var(--m-btn-a), var(--m-btn-b)); border: 1px solid var(--m-edge);
+  box-shadow: inset 0 1px 0 var(--m-hi), 0 1px 2px var(--m-lo);
+  transition: transform .32s var(--m-ease), box-shadow .32s var(--m-ease), background .3s ease, border-color .25s ease, opacity .2s ease, color .2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:hover { background: linear-gradient(180deg, var(--m-btn-a), var(--m-btn-a)); border-color: rgba(120,165,255,.42); transform: translateY(-1px); box-shadow: inset 0 1px 0 var(--m-hi), 0 8px 18px -10px rgba(23,105,255,.5); }
+.btn:active { transform: translateY(0) scale(.965); transition-duration: .1s; box-shadow: inset 0 1px 2px var(--m-lo); }
+.btn:focus-visible, .chip:focus-visible, .input:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(47,123,255,.4); }
+.btn-primary {
+  background: linear-gradient(180deg, #5a9cff 0%, #2a74ff 48%, #1458e6 100%); border-color: rgba(255,255,255,.22); color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.5), inset 0 -1px 0 rgba(0,20,90,.35), 0 10px 24px -10px rgba(23,105,255,.9);
+  text-shadow: 0 1px 0 rgba(0,30,110,.35);
+}
+.btn-primary:hover { background: linear-gradient(180deg, #6aa7ff 0%, #3b81ff 48%, #1a62f5 100%); border-color: rgba(255,255,255,.34); box-shadow: inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 0 rgba(0,20,90,.35), 0 14px 30px -10px rgba(23,105,255,1); opacity: 1; }
+.btn-primary:active { box-shadow: inset 0 2px 4px rgba(0,20,90,.45), 0 4px 12px -6px rgba(23,105,255,.8); }
+.btn-danger { background: linear-gradient(180deg, color-mix(in oklab, var(--bad) 16%, transparent), color-mix(in oklab, var(--bad) 7%, transparent)); border-color: color-mix(in oklab, var(--bad) 35%, transparent); }
+.btn-danger:hover { border-color: color-mix(in oklab, var(--bad) 60%, transparent); box-shadow: 0 8px 18px -10px var(--bad); }
+.btn:disabled { opacity: .5; }
+
+/* Input kaca, fokus bercahaya biru */
+.input { background: var(--m-input); border: 1px solid var(--m-edge); box-shadow: inset 0 1px 2px var(--m-lo);
+  transition: border-color .25s ease, box-shadow .3s var(--m-ease), background .25s ease; }
+.input:hover:not(:focus) { border-color: rgba(120,165,255,.4); }
+.input:focus { border-color: #4a8dff; background: color-mix(in oklab, var(--m-input) 70%, var(--panel)); box-shadow: 0 0 0 3px rgba(47,123,255,.28), 0 0 22px -6px rgba(47,123,255,.55); }
+select.input { cursor: pointer; }
+
+/* Chip & badge */
+.chip { background: linear-gradient(180deg, var(--m-btn-a), var(--m-btn-b)); border-color: var(--m-edge); box-shadow: inset 0 1px 0 var(--m-hi);
+  transition: transform .3s var(--m-ease), background .25s ease, border-color .25s ease, box-shadow .3s var(--m-ease); }
+.chip:hover { transform: translateY(-1px); }
+.chip:active { transform: scale(.95); }
+.chip[data-on="true"] { background: linear-gradient(180deg, #5a9cff, #1769ff); border-color: rgba(255,255,255,.25); box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 8px 18px -8px rgba(23,105,255,.9); }
+.badge { border: 1px solid color-mix(in oklab, currentColor 22%, transparent); letter-spacing: .01em; }
+
+/* Navigasi: pil aktif biru elektrik, sidebar & tab bar kaca */
+.nav-pill { background: linear-gradient(180deg, #5a9cff, #1769ff) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 10px 24px -10px rgba(23,105,255,.95) !important; transition: transform .5s var(--m-ease), height .3s ease !important; }
+aside.no-print { background: linear-gradient(180deg, var(--m-card-a), var(--m-card-b)), color-mix(in oklab, var(--panel) 70%, transparent) !important; border-right-color: var(--m-edge) !important; box-shadow: inset -1px 0 0 var(--m-hi); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); }
+nav.no-print.fixed { background: linear-gradient(180deg, var(--m-card-a), var(--m-card-b)), color-mix(in oklab, var(--panel) 78%, transparent) !important; border-top-color: var(--m-edge) !important; -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); }
+.nav-link { transition: color .25s ease, background .3s ease, transform .3s var(--m-ease) !important; }
+.nav-link:hover { transform: translateX(2px); }
+
+/* Sheet / dialog: kaca tebal */
+.sheet-panel { background: linear-gradient(160deg, var(--m-card-a), var(--m-card-b) 42%), color-mix(in oklab, var(--panel) 94%, transparent) !important; border-color: var(--m-edge) !important;
+  box-shadow: inset 0 1px 0 var(--m-hi), 0 40px 90px -24px rgba(0,0,0,.75) !important; -webkit-backdrop-filter: blur(30px) saturate(1.5); backdrop-filter: blur(30px) saturate(1.5); }
+.sheet-bg { background: rgba(2,6,16,.55) !important; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+
+/* Tabel & daftar */
+.table th { background: color-mix(in oklab, var(--panel-2) 55%, transparent); }
+.table tbody tr:hover { background: color-mix(in oklab, #2f7bff 9%, transparent); }
+
+/* Latar aurora lebih elektrik */
+.aurora { background:
+  radial-gradient(70vw 46vh at 88% -12%, rgba(23,105,255,.2), transparent 70%),
+  radial-gradient(50vw 40vh at 4% 0%, rgba(0,160,255,.09), transparent 70%),
+  linear-gradient(180deg, var(--bg) 0%, color-mix(in oklab, var(--bg) 80%, #061329) 100%); }
+.aurora .a1 { background: radial-gradient(closest-side, rgb(0 110 255 / .68), rgb(0 92 240 / .28) 55%, transparent 100%); }
+.aurora .a2 { background: radial-gradient(closest-side, rgb(0 205 255 / .6), rgb(0 115 255 / .28) 55%, transparent 100%); }
+.aurora .a3 { background: radial-gradient(closest-side, rgb(30 110 255 / .62), rgb(0 84 225 / .26) 55%, transparent 100%); }
+
+@media (prefers-reduced-motion: reduce) { .btn, .chip, .card, .nav-link, .input { transition: none !important; } .btn:hover, .chip:hover { transform: none; } }
+@media print { .card { background: #fff !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; } }

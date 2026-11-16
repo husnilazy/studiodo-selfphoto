@@ -201,7 +201,7 @@ function RoomForm({ room, storage }: { room?: Room; storage: boolean }) {
     <>
       <ActionForm action={saveRoom.bind(null, room?.id ?? null)}>
         <Field label="Nama ruang / background"><input name="name" className="input" required defaultValue={room?.name} placeholder="mis. Studio A – Putih Polos" /></Field>
-        <Field label="Warna penanda di jadwal"><input name="color" type="color" className="input !p-1" defaultValue={room?.color ?? "#4f4fe8"} /></Field>
+        <Field label="Warna penanda di jadwal"><input name="color" type="color" className="input !p-1" defaultValue={room?.color ?? "#1769ff"} /></Field>
         <Field label="Keterangan (tampil di website)"><input name="description" className="input" defaultValue={room?.description} /></Field>
         <ImageUploadField name="image_url" defaultValue={room?.image_url} storage={storage} label="Foto contoh background (tampil di website)" />
         <ActiveToggle on={room?.active ?? true} />
