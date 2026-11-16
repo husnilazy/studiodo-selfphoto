@@ -41,11 +41,12 @@ export default function AppShell({ user, brand, children }: { user: { name: stri
   const logout = async () => { await logoutAction(); router.replace("/login"); router.refresh(); };
 
   return (
-    <div className="min-h-dvh lg:pl-64">
+    <div className="relative isolate min-h-dvh lg:pl-64">
+      <div className="aurora no-print" aria-hidden><i className="a1" /><i className="a2" /><i className="a3" /></div>
       <NavProgress />
       <Toaster />
       {/* Sidebar desktop */}
-      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-line bg-panel p-4 lg:flex">
+      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-line bg-panel/75 p-4 backdrop-blur-xl lg:flex">
         <Link href="/dashboard" aria-label="Beranda" className="mb-6 flex min-h-10 items-center px-2 pt-1 transition-transform duration-300 hover:scale-[1.03]">
           <BrandMark name={brand.name} logo={brand.logo} logoDark={brand.logoDark} height={Math.min(brand.height, 38)} text={brand.text} textSize={Math.min(brand.textSize, 18)} textFont={brand.textFont} />
         </Link>

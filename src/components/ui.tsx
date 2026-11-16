@@ -13,7 +13,7 @@ export function PageHeader({
             <Icon name="left" className="size-3.5" /> Kembali
           </Link>
         )}
-        <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+        <h1 className="font-serif-ui text-3xl sm:text-4xl">{title}</h1>
         {subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -32,10 +32,10 @@ export function Stat({
   return (
     <div className="card hover-lift anim-rise p-4" style={{ ["--i" as string]: i }}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-muted">{label}</p>
+        <p className="font-mono-ui text-[11px] font-medium uppercase tracking-[.08em] text-muted">{label}</p>
         {icon && <span className="grid size-8 place-items-center rounded-xl bg-accentsoft text-accent"><Icon name={icon} className="size-4" /></span>}
       </div>
-      <p className={`font-display tnum mt-1 text-xl font-semibold sm:text-2xl ${color}`}>{typeof value === "string" || typeof value === "number" ? <CountUp value={String(value)} /> : value}</p>
+      <p className={`font-serif-ui tnum mt-1 text-3xl sm:text-4xl ${color}`}>{typeof value === "string" || typeof value === "number" ? <CountUp value={String(value)} /> : value}</p>
       {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
     </div>
   );

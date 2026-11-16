@@ -7,26 +7,29 @@
   --fg: #0b1020;
   --muted: #667089;
   --line: #e4e7f1;
-  --accent: #4f4fe8;
+  --accent: #1769ff;
   --accent-fg: #ffffff;
-  --accent-soft: #eceeff;
+  --accent-soft: #e6efff;
+  --aurora-o: .38;
   --ok: #12945a; --ok-soft: #e1f6ec;
   --warn: #b7791f; --warn-soft: #fdf1d8;
   --bad: #d33a3a; --bad-soft: #fde7e7;
   --shadow: 0 1px 2px rgba(20,24,60,.05), 0 8px 24px -12px rgba(20,24,60,.12);
 }
 :root[data-theme="dark"] {
-  --bg: #0a0d18; --panel: #141829; --panel-2: #1b2036; --fg: #eceeff; --muted: #9aa3bd; --line: #262c47;
-  --accent: #8a8aff; --accent-fg: #0a0d18; --accent-soft: #23264a;
-  --ok: #4ad49a; --ok-soft: #12332a; --warn: #f0b95a; --warn-soft: #3a2d12; --bad: #ff7b7b; --bad-soft: #3b1b1f;
-  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  --bg: #05070a; --panel: #0a0d12; --panel-2: #10151e; --fg: #f4f7ff; --muted: #8e9ab6; --line: rgba(160,180,255,.13);
+  --accent: #2f7bff; --accent-fg: #ffffff; --accent-soft: rgba(47,123,255,.17);
+  --ok: #3ddc9b; --ok-soft: rgba(61,220,155,.14); --warn: #f0b95a; --warn-soft: rgba(240,185,90,.14); --bad: #ff7b7b; --bad-soft: rgba(255,123,123,.14);
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 14px 34px -18px rgba(0,0,0,.7);
+  --aurora-o: 1; --glow: rgba(47,123,255,.24);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0a0d18; --panel: #141829; --panel-2: #1b2036; --fg: #eceeff; --muted: #9aa3bd; --line: #262c47;
-    --accent: #8a8aff; --accent-fg: #0a0d18; --accent-soft: #23264a;
-    --ok: #4ad49a; --ok-soft: #12332a; --warn: #f0b95a; --warn-soft: #3a2d12; --bad: #ff7b7b; --bad-soft: #3b1b1f;
-    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    --bg: #05070a; --panel: #0a0d12; --panel-2: #10151e; --fg: #f4f7ff; --muted: #8e9ab6; --line: rgba(160,180,255,.13);
+    --accent: #2f7bff; --accent-fg: #ffffff; --accent-soft: rgba(47,123,255,.17);
+    --ok: #3ddc9b; --ok-soft: rgba(61,220,155,.14); --warn: #f0b95a; --warn-soft: rgba(240,185,90,.14); --bad: #ff7b7b; --bad-soft: rgba(255,123,123,.14);
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 14px 34px -18px rgba(0,0,0,.7);
+    --aurora-o: 1; --glow: rgba(47,123,255,.24);
   }
 }
 
@@ -46,17 +49,25 @@
   --color-warnsoft: var(--warn-soft);
   --color-bad: var(--bad);
   --color-badsoft: var(--bad-soft);
-  --font-sans: var(--font-jakarta), system-ui, sans-serif;
+  --font-sans: var(--font-dm), var(--font-jakarta), system-ui, sans-serif;
+  --font-serif-ui: var(--font-instrument), Georgia, serif;
+  --font-mono-ui: var(--font-plexmono), ui-monospace, monospace;
   --font-display: var(--font-sora), system-ui, sans-serif;
 }
 
 html { color-scheme: light dark; -webkit-tap-highlight-color: transparent; }
-body { background: var(--bg); color: var(--fg); font-family: var(--font-jakarta), system-ui, sans-serif; overflow-x: hidden; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-dm), var(--font-jakarta), system-ui, sans-serif; overflow-x: hidden; }
+.site { font-family: var(--font-jakarta), system-ui, sans-serif; }
+
+/* Tipografi editorial untuk aplikasi: serif untuk judul & angka besar, mono kecil untuk label teknis */
+.font-serif-ui { font-family: var(--font-instrument), Georgia, serif; font-weight: 400 !important; letter-spacing: -.015em; }
+.font-mono-ui { font-family: var(--font-plexmono), ui-monospace, monospace; }
 * { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 .tnum { font-variant-numeric: tabular-nums; }
 
 @layer components {
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 1.1rem; box-shadow: var(--shadow); }
+  .card { background: color-mix(in oklab, var(--panel) 76%, transparent); border: 1px solid var(--line); border-radius: 1.1rem; box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2); }
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; min-height: 2.75rem; padding: 0 1.1rem;
     border-radius: .85rem; font-weight: 600; font-size: .9rem; border: 1px solid var(--line); background: var(--panel); color: var(--fg);
     transition: transform .12s ease, background .15s ease, opacity .15s ease, box-shadow .15s ease; cursor: pointer; white-space: nowrap; }
@@ -72,7 +83,7 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-jakarta)
     background: var(--panel); color: var(--fg); font-size: 16px; outline: none; transition: border-color .15s, box-shadow .15s; }
   .input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
   textarea.input { min-height: 5rem; resize: vertical; }
-  .label { display: block; font-size: .75rem; font-weight: 600; color: var(--muted); margin-bottom: .3rem; letter-spacing: .01em; }
+  .label { display: block; font-family: var(--font-plexmono), ui-monospace, monospace; font-size: .68rem; font-weight: 500; text-transform: uppercase; color: var(--muted); margin-bottom: .35rem; letter-spacing: .08em; }
   .badge { display: inline-flex; align-items: center; gap: .3rem; padding: .15rem .55rem; border-radius: 999px; font-size: .7rem; font-weight: 700; white-space: nowrap; }
   .badge-green { background: var(--ok-soft); color: var(--ok); }
   .badge-amber { background: var(--warn-soft); color: var(--warn); }
@@ -84,7 +95,7 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-jakarta)
   .chip[data-on="true"] { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
   .chip:disabled { opacity: .35; pointer-events: none; text-decoration: line-through; }
   .table { width: 100%; border-collapse: collapse; font-size: .875rem; }
-  .table th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: .6rem .8rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .table th { text-align: left; font-family: var(--font-plexmono), ui-monospace, monospace; font-weight: 500; font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: .6rem .8rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
   .table td { padding: .7rem .8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
   .table tr:last-child td { border-bottom: 0; }
   .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -101,7 +112,29 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-jakarta)
 .spinner { width: 1rem; height: 1rem; border-radius: 999px; border: 2px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite; }
 @media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 
+/* ───────── Latar aurora (Midnight Blue) ───────── */
+.aurora { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; opacity: var(--aurora-o, 1);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--bg) 100%, transparent) 0%, color-mix(in oklab, var(--bg) 82%, #061329) 100%); }
+.aurora > i { position: absolute; bottom: -34vh; width: 60vw; height: 82vh; border-radius: 50%; will-change: transform, opacity; }
+.aurora .a1 { left: -14vw; background: radial-gradient(closest-side, rgb(0 110 255 / .55), rgb(0 92 240 / .22) 55%, transparent 100%); animation: aur-a 16s ease-in-out infinite alternate; }
+.aurora .a2 { left: 24vw; background: radial-gradient(closest-side, rgb(0 202 255 / .5), rgb(0 115 255 / .24) 55%, transparent 100%); animation: aur-b 19s ease-in-out infinite alternate; }
+.aurora .a3 { right: -16vw; background: radial-gradient(closest-side, rgb(23 105 255 / .5), rgb(0 84 225 / .22) 55%, transparent 100%); animation: aur-c 22s ease-in-out infinite alternate; }
+.aurora::before { content: ""; position: absolute; inset: 14% 0 0; opacity: .5;
+  background-image: repeating-linear-gradient(90deg, transparent 0, transparent 2px, rgb(54 177 255 / .16) 3px, transparent 4px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 70%); mask-image: linear-gradient(to bottom, transparent 0%, #000 70%);
+  animation: aur-lines 9s ease-in-out infinite alternate; }
+.aurora::after { content: ""; position: absolute; inset: 0; opacity: .5;
+  background-image: radial-gradient(1px 1px at 20% 30%, rgb(160 205 255 / .8), transparent), radial-gradient(1px 1px at 60% 70%, rgb(160 205 255 / .7), transparent), radial-gradient(1.5px 1.5px at 80% 20%, rgb(120 190 255 / .7), transparent), radial-gradient(1px 1px at 40% 85%, rgb(160 205 255 / .6), transparent);
+  background-size: 360px 360px; animation: aur-dots 60s linear infinite; }
+@keyframes aur-a { from { transform: translate3d(0, 0, 0) scale(1); opacity: .85; } to { transform: translate3d(9vw, -5vh, 0) scale(1.14); opacity: 1; } }
+@keyframes aur-b { from { transform: translate3d(0, 2vh, 0) scale(1.05); opacity: .8; } to { transform: translate3d(-8vw, -6vh, 0) scale(.94); opacity: 1; } }
+@keyframes aur-c { from { transform: translate3d(0, 0, 0) scale(.96); opacity: .8; } to { transform: translate3d(-10vw, -4vh, 0) scale(1.12); opacity: 1; } }
+@keyframes aur-lines { from { opacity: .3; } to { opacity: .6; } }
+@keyframes aur-dots { to { background-position: 360px -360px; } }
+@media (max-width: 640px) { .aurora > i { width: 110vw; height: 60vh; } .aurora .a3 { display: none; } .aurora::after { display: none; } }
+
 @media print {
+  .aurora { display: none !important; }
   body { background: #fff !important; color: #000 !important; }
   .no-print { display: none !important; }
   .card { box-shadow: none !important; border-color: #ccc !important; }
@@ -110,8 +143,8 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-jakarta)
 
 /* ───────── Website publik (landing & booking online) ───────── */
 :root { --accent-2: #a78bfa; --glow: rgba(79, 79, 232, .28); }
-:root[data-theme="dark"] { --glow: rgba(138, 138, 255, .22); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --glow: rgba(138, 138, 255, .22); } }
+:root[data-theme="dark"] { --glow: rgba(47, 123, 255, .24); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --glow: rgba(47, 123, 255, .24); } }
 
 html { scroll-behavior: smooth; }
 .site { position: relative; isolation: isolate; overflow-x: clip; }
