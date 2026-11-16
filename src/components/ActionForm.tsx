@@ -3,6 +3,7 @@ import { createContext, startTransition, useActionState, useContext, useEffect, 
 import { useRouter } from "next/navigation";
 import { useSheet } from "./Sheet";
 import { toast } from "./Toaster";
+import { askConfirm } from "./ConfirmHost";
 
 export type ActionState = { ok?: boolean; error?: string; message?: string; redirect?: string } | null;
 export type Action = (prev: ActionState, fd: FormData) => Promise<ActionState>;
@@ -37,11 +38,17 @@ export default function ActionForm({
     <PendingCtx.Provider value={pending}>
       <form
         className={className}
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          if (confirm && !window.confirm(confirm)) return;
+          const form = e.currentTarget;
           if (pending) return;
-          const fd = new FormData(e.currentTarget);
+          if (confirm) {
+            const verb = /^(hapus|batalkan|putuskan|keluarkan)/i.exec(confirm)?.[1]?.toLowerCase();
+            const risky = danger || !!verb;
+            const label = submit && submit !== "Simpan" && !/^Samakan/.test(submit) ? submit : verb ? `Ya, ${verb}` : "Ya, lanjut";
+            if (!(await askConfirm({ message: confirm, danger: risky, confirmLabel: label }))) return;
+          }
+          const fd = new FormData(form);
           startTransition(() => run(fd));
         }}
       >

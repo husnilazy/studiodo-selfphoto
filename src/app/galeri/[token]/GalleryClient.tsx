@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Gallery, GFile } from "@/lib/gallery";
 import { waLink } from "@/lib/format";
+import ConfirmHost, { askConfirm } from "@/components/ConfirmHost";
 
 const thumb = (id: string, w = 700) => `https://lh3.googleusercontent.com/d/${id}=w${w}`;
 const full = (id: string) => `https://lh3.googleusercontent.com/d/${id}=w2400`;
@@ -144,10 +145,10 @@ export default function GalleryClient({ token, g }: { token: string; g: Gallery 
   // ── unduh ──
   const trigger = (url: string) => { const a = document.createElement("a"); a.href = url; a.download = ""; document.body.appendChild(a); a.click(); a.remove(); };
   const dlSingle = (name: string) => say(`Mengunduh ${name}…`, "busy", 3500);
-  const dlZip = (ids: number[] | "all", label: string, count: number) => {
+  const dlZip = async (ids: number[] | "all", label: string, count: number) => {
     if (!count) return;
     if (count > 500) { say("Maksimal 500 file per ZIP. Pilih sebagian dulu ya.", "bad"); return; }
-    if (count > 80 && !confirm(`Unduh ${count} file sebagai satu ZIP? Ukurannya bisa besar; pastikan koneksi stabil dan jangan tutup halaman sampai selesai.`)) return;
+    if (count > 80 && !(await askConfirm({ title: `Unduh ${count} file?`, message: "Semuanya dijadikan satu ZIP. Ukurannya bisa besar — pastikan koneksi stabil dan jangan tutup halaman sampai unduhan selesai.", confirmLabel: "Unduh ZIP" }))) return;
     const url = ids === "all"
       ? `/api/galeri/${token}/zip${typeof tab === "number" ? `?album=${tab}` : ""}`
       : `/api/galeri/${token}/zip?ids=${ids.join(",")}`;
@@ -225,6 +226,7 @@ export default function GalleryClient({ token, g }: { token: string; g: Gallery 
   return (
     <main className="gal relative min-h-dvh">
       <div className="aurora" aria-hidden><i className="a1" /><i className="a2" /><i className="a3" /></div>
+      <ConfirmHost />
 
       {!online && <div role="status" className="sticky top-0 z-40 bg-warn px-4 py-2 text-center text-sm font-semibold text-black">Kamu sedang offline — favorit dan unduhan jalan lagi saat internet kembali.</div>}
 

@@ -411,3 +411,16 @@ nav.no-print.fixed { background: color-mix(in oklab, var(--panel) 86%, transpare
   background: var(--bg); color: var(--fg); isolation: isolate; color-scheme: dark; }
 @media (prefers-reduced-motion: reduce) { .btn, .chip, .card, .nav-link, .input { transition: none !important; } .btn:hover, .chip:hover { transform: none; } }
 @media print { .card { background: #fff !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; } }
+
+/* Dialog konfirmasi bertema (pengganti confirm() bawaan peramban) */
+@keyframes cf-in { from { opacity: 0; transform: translateY(14px) scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes cf-out { to { opacity: 0; transform: translateY(8px) scale(.96); } }
+@keyframes cf-bg { from { opacity: 0; } to { opacity: 1; } }
+.confirm-bg { background: rgba(2,3,12,.62); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: cf-bg .2s ease both; }
+.confirm-panel { background: color-mix(in oklab, var(--panel) 96%, transparent); box-shadow: inset 0 1px 0 var(--m-hi, rgba(255,255,255,.05)), 0 40px 90px -24px rgba(0,0,0,.75), 0 0 80px -40px rgba(26,86,255,.5);
+  -webkit-backdrop-filter: blur(26px); backdrop-filter: blur(26px); animation: cf-in .28s cubic-bezier(.2,.8,.2,1) both; }
+.confirm-closing .confirm-panel { animation: cf-out .16s ease-in both; }
+.confirm-closing .confirm-bg { animation: cf-bg .16s ease reverse both; }
+.confirm-danger { background: linear-gradient(180deg, #f2626a, #d92d3a) !important; border-color: transparent !important; color: #fff !important; box-shadow: 0 8px 24px -8px rgba(217,45,58,.75), inset 0 1px 0 rgba(255,255,255,.25) !important; }
+.confirm-danger:hover { box-shadow: 0 12px 30px -8px rgba(217,45,58,.95), inset 0 1px 0 rgba(255,255,255,.3) !important; }
+@media (prefers-reduced-motion: reduce) { .confirm-panel, .confirm-bg { animation: none !important; } }

@@ -5,6 +5,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import Icon from "./Icon";
 import NavProgress from "./NavProgress";
 import Toaster from "./Toaster";
+import ConfirmHost from "./ConfirmHost";
 import BrandMark from "./site/BrandMark";
 import { logoutAction } from "@/app/actions/auth";
 import { ROLE_LABEL } from "@/lib/format";
@@ -45,6 +46,7 @@ export default function AppShell({ user, brand, children }: { user: { name: stri
       <div className="aurora no-print" aria-hidden><i className="a1" /><i className="a2" /><i className="a3" /></div>
       <NavProgress />
       <Toaster />
+      <ConfirmHost />
       {/* Sidebar desktop */}
       <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-line bg-panel/75 p-4 backdrop-blur-xl lg:flex">
         <Link href="/dashboard" aria-label="Beranda" className="mb-6 flex min-h-10 items-center px-2 pt-1 transition-transform duration-300 hover:scale-[1.03]">

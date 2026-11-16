@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import ConfirmHost, { askConfirm } from "../ConfirmHost";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Icon from "../Icon";
 import { toast } from "../Toaster";
@@ -25,6 +27,7 @@ type Props = {
 const dims = async (src: string) => { const im = await loadImg(src); return { nw: im.naturalWidth, nh: im.naturalHeight }; };
 
 export default function EditorApp({ initial, designId: initialId, frames, storage, canManageFrames, customer, startFrame, brand, assets: initialAssets }: Props) {
+  const router = useRouter();
   const [doc, setDocState] = useState<Design>(initial);
   const docRef = useRef(initial);
   const [past, setPast] = useState<Design[]>([]);
@@ -389,7 +392,7 @@ export default function EditorApp({ initial, designId: initialId, frames, storag
       onDrop={(e) => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files.length) void onFiles(e.dataTransfer.files); }}>
       {/* bilah atas */}
       <header className="no-print flex flex-wrap items-center gap-2 border-b border-line bg-panel px-3 py-2">
-        <Link href="/studio" className="btn btn-sm !min-h-9" onClick={(e) => { if (dirty && !confirm("Ada perubahan yang belum disimpan. Keluar tanpa menyimpan?")) e.preventDefault(); }}><Icon name="left" className="size-4" /> Studio</Link>
+        <Link href="/studio" className="btn btn-sm !min-h-9" onClick={async (e) => { if (!dirty) return; e.preventDefault(); if (await askConfirm({ title: "Keluar tanpa menyimpan?", message: "Ada perubahan yang belum disimpan. Kalau keluar sekarang, perubahan itu hilang.", danger: true, confirmLabel: "Keluar", cancelLabel: "Tetap di sini" })) router.push("/studio"); }}><Icon name="left" className="size-4" /> Studio</Link>
         <input value={doc.name} onChange={(e) => mutate((d) => ({ ...d, name: e.target.value }), "name")} className="input !min-h-9 !w-48 !py-1 font-semibold sm:!w-64" aria-label="Nama desain" />
         {customer && <span className="badge badge-indigo hidden sm:inline-flex">Untuk: {customer.name}</span>}
         <span className="text-xs font-semibold text-muted">{dirty ? "● belum disimpan" : designId ? "tersimpan" : ""}</span>
@@ -461,6 +464,7 @@ export default function EditorApp({ initial, designId: initialId, frames, storag
 
       <input ref={replaceInput} type="file" accept="image/*" className="hidden" onChange={(e) => { void onReplaceFile(e.target.files?.[0]); e.target.value = ""; }} />
       {drag && <div className="pointer-events-none fixed inset-0 z-[70] grid place-items-center bg-accent/20 text-xl font-bold text-accent backdrop-blur-sm">Lepas untuk menambahkan foto</div>}
+      <ConfirmHost />
       {showExport && <ExportDialog doc={doc} pageIdx={Math.min(pi, doc.pages.length - 1)} designId={designId} storage={storage} onClose={() => setShowExport(false)} />}
     </div>
   );
