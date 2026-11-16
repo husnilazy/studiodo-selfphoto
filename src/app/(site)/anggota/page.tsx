@@ -2,7 +2,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import MemberCardView from "@/components/MemberCardView";
 import Reveal from "@/components/site/Reveal";
-import { q } from "@/lib/db";
+import { one, q } from "@/lib/db";
 import { CATEGORY_LABEL, dateWIB, fmtDate, rupiah, timeWIB, todayWIB } from "@/lib/format";
 import { loadMemberCard } from "@/lib/memberCard";
 import { getMemberPage, memberSessionId } from "@/lib/memberServer";
@@ -30,6 +30,7 @@ export default async function MemberArea({ searchParams }: { searchParams: Promi
           <p className="mb-8 mt-2 text-muted">Masuk dengan nomor WhatsApp dan kode member untuk melihat kartu, stempel, voucher, dan info khusus member.</p>
           <LoginForm code={String(sp.kode ?? "").toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 20)} />
           <p className="mt-6 text-sm text-muted">Belum jadi member? Tanyakan ke kasir saat sesi berikutnya — gratis!</p>
+          <p className="mt-2 text-sm text-muted">Hanya ingin lihat foto sesimu? <Link href="/galeri" className="font-semibold text-accent">Buka galeri dengan kode booking</Link>.</p>
         </div>
       </main>
     );
@@ -59,6 +60,11 @@ export default async function MemberArea({ searchParams }: { searchParams: Promi
   const reward = nextIsReward(cfg, c.visits), left = visitsToReward(cfg, c.visits);
   const tierPct = cfg.tiers.find((t) => t.name === d.tier)?.percent ?? 0;
   const first = c.name.split(" ")[0];
+  const gal = await one<{ gallery_token: string | null; n: number; fav: number }>(
+    `select c.gallery_token,
+            (select count(*)::int from customer_files f where f.customer_id = c.id and f.drive_file_id is not null and f.kind in ('foto_asli','foto_edit','video') and f.status in ('siap','terkirim')) as n,
+            (select count(*)::int from gallery_favorites g where g.customer_id = c.id) as fav
+       from customers c where c.id = $1`, [c.id]);
 
   return (
     <main className="px-4 pb-20 pt-24 sm:px-6 sm:pt-28">
@@ -81,6 +87,21 @@ export default async function MemberArea({ searchParams }: { searchParams: Promi
           <div className="mb-6 grid grid-cols-1 gap-5 md:grid-cols-2">
             <MemberCardView side="front" brand={d.brand} name={c.name} code={c.member_no} tier={d.tier} since={d.since} qrSvg={d.qrSvg} host={d.host} stamps={stamps} />
             <MemberCardView side="back" brand={d.brand} name={c.name} code={c.member_no} tier={d.tier} since={d.since} host={d.host} stamps={stamps} />
+          </div>
+        </Reveal>
+
+        <Reveal>
+          <div className="glass mb-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl p-5">
+            <div className="flex min-w-0 items-center gap-4">
+              <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-accentsoft text-accent"><Icon name="camera" className="size-6" /></span>
+              <div className="min-w-0">
+                <h2 className="font-display text-lg font-semibold">Galeri fotomu</h2>
+                <p className="text-sm text-muted">
+                  {gal?.gallery_token && gal.n > 0 ? <>{gal.n} foto &amp; video siap{gal.fav > 0 && <> · {gal.fav} favorit</>}. Pilih favorit, unduh, dan bagikan.</> : "Foto & video hasil sesimu akan muncul di sini begitu siap."}
+                </p>
+              </div>
+            </div>
+            {gal?.gallery_token && gal.n > 0 && <Link href={`/galeri/${gal.gallery_token}`} className="btn btn-primary btn-glow !rounded-full">Buka galeri</Link>}
           </div>
         </Reveal>
 
