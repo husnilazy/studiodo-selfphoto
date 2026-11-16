@@ -1,5 +1,6 @@
 import "server-only";
 import { q as rootQ, type Q } from "./db";
+import { rupiah } from "./format";
 
 export type Shift = {
   id: number; opened_by: number | null; opener: string | null; opened_at: string; opening_cash: number; open_note: string;
@@ -31,6 +32,16 @@ export async function shiftTotals(shiftId: number, openingCash: number, q: Q = r
   return { cash, qris, transfer, cashOut, cashIn, expected: openingCash + cash + cashIn - cashOut };
 }
 
+/** Uang tunai tidak bisa keluar lebih banyak dari yang ada di laci. Menolak dengan pesan yang menjelaskan jalan keluarnya. */
+export async function assertDrawerHas(q: Q, sh: { id: number; opening_cash: number | string }, amount: number) {
+  const t = await shiftTotals(sh.id, Number(sh.opening_cash), q);
+  if (t.expected - amount < 0) {
+    throw new Error(
+      `Uang tunai di laci hanya ${rupiah(Math.max(0, t.expected))}, sedangkan yang keluar ${rupiah(amount)}. ` +
+      `Kalau uangnya dari kantong sendiri, pilih "Dibayar pribadi"; kalau laci memang berisi uang yang belum dicatat, pakai "Tambah Uang Laci" dulu.`);
+  }
+}
+
 export async function lastClosingCash(): Promise<number> {
   // Saldo akun Kas di buku: sudah memperhitungkan prive/setor bank/pengeluaran di luar shift.
   const [r] = await rootQ<{ b: number }>(
@@ -47,6 +58,7 @@ export async function linkCashMove(q: Q, m: { delta: number; note: string; userI
   if (m.delta === 0) return;
   const sh = await getOpenShift(q);
   if (!sh) return;
+  if (m.delta < 0) await assertDrawerHas(q, sh, -m.delta);
   await q("insert into shift_moves (shift_id, amount, kind, note, expense_id, journal_id, created_by) values ($1,$2,$3,$4,$5,$6,$7)",
     [sh.id, Math.abs(m.delta), m.delta > 0 ? "in" : "out", m.note, m.expenseId ?? null, m.journalId ?? null, m.userId]);
 }

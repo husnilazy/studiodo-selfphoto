@@ -5,7 +5,7 @@ import { tx } from "@/lib/db";
 import { actionUser } from "@/lib/auth";
 import { int, req, safe, str } from "@/lib/action";
 import { postJournal } from "@/lib/ledger";
-import { getOpenShift, shiftTotals } from "@/lib/shift";
+import { assertDrawerHas, getOpenShift, shiftTotals } from "@/lib/shift";
 import { rupiah, todayWIB } from "@/lib/format";
 import type { ActionState } from "@/components/ActionForm";
 
@@ -49,24 +49,50 @@ export async function addShiftExpense(_p: ActionState, fd: FormData) {
     const amount = int(fd, "amount");
     if (amount <= 0) throw new Error("Nominal harus lebih dari 0.");
     const note = req(str(fd, "note"), "Tulis keperluan pengeluaran.");
+    // "drawer" = diambil dari uang di laci; "owner" = ditalangi pemilik dengan uang pribadi (laci tidak berubah).
+    const fromOwner = str(fd, "source") === "owner";
     await tx(async (q) => {
       const sh = await getOpenShift(q);
       if (!sh) throw new Error("Buka shift dulu.");
       const [acc] = await q<{ id: number; code: string }>("select id, code from accounts where id = $1 and type = 'expense' and active", [int(fd, "account_id")]);
       if (!acc) throw new Error("Pilih kategori pengeluaran.");
-      const [cash] = await q<{ id: number }>("select id from accounts where code = '1101'");
+      if (!fromOwner) await assertDrawerHas(q, sh, amount);
+      const [src] = await q<{ id: number; code: string }>("select id, code from accounts where code = $1", [fromOwner ? "3101" : "1101"]);
       const date = todayWIB();
       const [e] = await q<{ id: number }>(
         "insert into expenses (date, account_id, paid_from_account_id, amount, vendor, note, created_by) values ($1,$2,$3,$4,'',$5,$6) returning id",
-        [date, acc.id, cash.id, amount, note, user.id]);
+        [date, acc.id, src.id, amount, note, user.id]);
       const jid = await postJournal(q, {
-        date, memo: `Kas keluar laci (shift #${sh.id}) – ${note}`, refType: "expense", refId: e.id, userId: user.id,
-        lines: [{ account: acc.code, debit: amount }, { account: "1101", credit: amount }],
+        date, memo: `${fromOwner ? "Dibayar pribadi (ditalangi pemilik)" : "Kas keluar laci"} (shift #${sh.id}) – ${note}`, refType: "expense", refId: e.id, userId: user.id,
+        lines: [{ account: acc.code, debit: amount }, { account: src.code, credit: amount }],
       });
       await q("update expenses set journal_id = $1 where id = $2", [jid, e.id]);
-      await q("insert into shift_moves (shift_id, amount, note, expense_id, created_by) values ($1,$2,$3,$4,$5)", [sh.id, amount, note, e.id, user.id]);
+      // Hanya uang yang benar-benar keluar dari laci yang masuk hitungan laci.
+      if (!fromOwner) await q("insert into shift_moves (shift_id, amount, note, expense_id, created_by) values ($1,$2,$3,$4,$5)", [sh.id, amount, note, e.id, user.id]);
     });
     refresh();
+    return { ok: true, message: fromOwner ? "Tercatat sebagai pengeluaran yang ditalangi pemilik." : "Kas keluar dicatat." };
+  });
+}
+
+/** Tambah uang ke laci saat shift berjalan (modal tambahan, uang kembalian, setoran pemilik). Jurnal: Kas bertambah, Modal bertambah. */
+export async function addDrawerCash(_p: ActionState, fd: FormData) {
+  return safe(async () => {
+    const user = await actionUser();
+    const amount = int(fd, "amount");
+    if (amount <= 0) throw new Error("Nominal harus lebih dari 0.");
+    const note = str(fd, "note") || "Tambah uang laci";
+    await tx(async (q) => {
+      const sh = await getOpenShift(q);
+      if (!sh) throw new Error("Buka shift dulu.");
+      const jid = await postJournal(q, {
+        date: todayWIB(), memo: `Uang masuk laci (shift #${sh.id}) – ${note}`, refType: "cash", userId: user.id,
+        lines: [{ account: "1101", debit: amount }, { account: "3101", credit: amount }],
+      });
+      await q("insert into shift_moves (shift_id, amount, kind, note, journal_id, created_by) values ($1,$2,'in',$3,$4,$5)", [sh.id, amount, note, jid, user.id]);
+    });
+    refresh();
+    return { ok: true, message: "Uang laci ditambahkan." };
   });
 }
 
@@ -74,13 +100,14 @@ export async function closeShift(_p: ActionState, fd: FormData) {
   return safe(async () => {
     const user = await actionUser();
     const counted = int(fd, "counted_cash");
-    if (counted < 0) throw new Error("Uang fisik tidak boleh negatif.");
+    if (counted < 0) throw new Error("Uang fisik di laci tidak bisa minus. Isi 0 bila laci kosong.");
     const msg = await tx(async (q) => {
       const [sh] = await q<{ id: number; opened_by: number | null; opening_cash: number }>(
         "select id, opened_by, opening_cash from shifts where closed_at is null for update");
       if (!sh) throw new Error("Tidak ada shift yang terbuka.");
       if (sh.opened_by !== user.id && user.role === "kasir") throw new Error("Shift ini dibuka kasir lain. Hanya pembukanya, admin, atau owner yang bisa menutup.");
       const t = await shiftTotals(sh.id, Number(sh.opening_cash), q);
+      if (t.expected < 0) throw new Error(`Hitungan laci minus ${rupiah(t.expected)}: uang keluar lebih besar dari uang yang tercatat masuk. Pakai "Tambah Uang Laci" untuk mencatat uang yang sebenarnya ada, lalu tutup shift.`);
       const diff = counted - t.expected;
       const note = str(fd, "note");
       if (diff !== 0 && !note) throw new Error(`Ada selisih ${rupiah(diff)}. Tulis catatan penyebabnya.`);

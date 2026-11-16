@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { q } from "@/lib/db";
 import { fmtDateTime, rupiah } from "@/lib/format";
 import { getOpenShift, lastClosingCash, shiftTotals, type Shift } from "@/lib/shift";
-import { CloseShiftForm, OpenShiftForm, ShiftExpenseForm } from "./ShiftForms";
+import { AddCashForm, CloseShiftForm, OpenShiftForm, ShiftExpenseForm } from "./ShiftForms";
 
 export const metadata = { title: "Shift Kasir" };
 
@@ -43,8 +43,11 @@ export default async function ShiftPage() {
               <p className="mt-1 text-sm text-muted">Dibuka {fmtDateTime(open.opened_at)} oleh {open.opener ?? "—"}{open.open_note && ` · ${open.open_note}`}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Sheet title="Kas Keluar dari Laci" trigger={<button className="btn"><Icon name="wallet" className="size-4" /> Kas Keluar</button>}>
-                <ShiftExpenseForm cats={cats} />
+              <Sheet title="Tambah Uang Laci" trigger={<button className="btn"><Icon name="dollar" className="size-4" /> Tambah Uang Laci</button>}>
+                <AddCashForm />
+              </Sheet>
+              <Sheet title="Kas Keluar" trigger={<button className="btn"><Icon name="wallet" className="size-4" /> Kas Keluar</button>}>
+                <ShiftExpenseForm cats={cats} inDrawer={t.expected} />
               </Sheet>
               <Sheet title="Tutup Shift" trigger={<button className="btn btn-primary"><Icon name="lock" className="size-4" /> Tutup Shift</button>}>
                 <CloseShiftForm expected={t.expected} />
@@ -67,8 +70,14 @@ export default async function ShiftPage() {
             </dl>
             <div className="mt-3 flex justify-between border-t border-line pt-3">
               <span className="font-semibold">Seharusnya di laci</span>
-              <span className="font-display tnum text-lg font-bold">{rupiah(t.expected)}</span>
+              <span className={`font-display tnum text-lg font-bold ${t.expected < 0 ? "text-bad" : ""}`}>{rupiah(t.expected)}</span>
             </div>
+            {t.expected < 0 && (
+              <p className="mt-3 rounded-xl bg-badsoft px-3 py-2 text-sm font-medium text-bad">
+                Hitungan laci minus: uang keluar lebih besar dari uang yang tercatat masuk (modal awal {rupiah(Number(open.opening_cash))}). Uang tunai tidak bisa minus —
+                kalau laci memang berisi uang yang belum dicatat, klik “Tambah Uang Laci” sebesar {rupiah(-t.expected)} atau lebih.
+              </p>
+            )}
             {moves.length > 0 && (
               <ul className="mt-4 divide-y divide-line border-t border-line text-sm">
                 {moves.map((m) => <li key={m.id} className="flex justify-between gap-3 py-2"><span className="truncate text-muted">{fmtDateTime(m.created_at)} · {m.note}</span><span className={`tnum font-semibold ${m.kind === "in" ? "text-ok" : "text-bad"}`}>{m.kind === "in" ? "+" : "−"}{rupiah(m.amount)}</span></li>)}
