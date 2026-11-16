@@ -3,11 +3,10 @@ import { currentUser } from "@/lib/auth";
 import { q } from "@/lib/db";
 import { accessToken } from "@/lib/gdrive";
 import { driveId } from "@/lib/siteConfig";
+import { safeFetch } from "@/lib/safeFetch";
 
 export const dynamic = "force-dynamic";
 const MAX = 30 * 1024 * 1024;
-
-const privateHost = (h: string) => /^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.|\[?::1)/i.test(h) || h.endsWith(".local") || h.endsWith(".internal");
 
 /**
  * Proxy gambar file customer (Google Drive / link) agar bisa dipakai di canvas editor tanpa terblokir CORS.
@@ -30,10 +29,10 @@ export async function GET(req: Request) {
       const dId = driveId(f.url);
       const target = dId ? `https://lh3.googleusercontent.com/d/${dId}=w${w || 2400}` : f.url;
       const u = new URL(target);
-      if (u.protocol !== "https:" || privateHost(u.hostname)) return new NextResponse("Link tidak diizinkan", { status: 400 });
-      res = await fetch(u, { redirect: "follow" });
+      res = await safeFetch(u);
     }
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && /diizinkan/.test(e.message)) return new NextResponse("Link tidak diizinkan", { status: 400 });
     return new NextResponse("Gagal mengambil gambar", { status: 502 });
   }
   const type = res.headers.get("content-type") ?? "";

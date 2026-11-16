@@ -4,6 +4,9 @@ import { fmtDateTime, todayWIB } from "./format";
 
 export async function checkConflict(q: Q, roomId: number | null, start: Date, end: Date, excludeId: number | null) {
   if (!roomId) return;
+  // Serialise bookings of the same room: without this two requests arriving together both see "no conflict" and both insert.
+  // The lock is held until the surrounding transaction ends (it is a no-op outside one).
+  await q("select pg_advisory_xact_lock(7001, $1)", [roomId]);
   const [c] = await q<{ code: string; start_at: string; end_at: string }>(
     `select code, start_at, end_at from bookings
       where room_id = $1 and status in ('pending','confirmed','done') and start_at < $3 and end_at > $2
@@ -13,6 +16,7 @@ export async function checkConflict(q: Q, roomId: number | null, start: Date, en
 }
 
 export async function genCode(q: Q) {
+  await q("select pg_advisory_xact_lock(7002, 0)", []); // two bookings made together must not pick the same running number
   const ymd = todayWIB().slice(2).replaceAll("-", "");
   const [r] = await q<{ n: number }>("select count(*)::int as n from bookings where code like $1", [`SD-${ymd}-%`]);
   let n = r.n + 1;

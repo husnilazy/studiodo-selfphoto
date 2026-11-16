@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/auth";
+import { safeFetch } from "@/lib/safeFetch";
 
 export const dynamic = "force-dynamic";
 const MAX = 15 * 1024 * 1024;
-const privateHost = (h: string) => /^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.|\[?::1)/i.test(h) || h.endsWith(".local") || h.endsWith(".internal");
 
 /** Meneruskan gambar https (mis. logo di Google Drive) lewat server agar bisa dipakai di canvas tanpa terblokir CORS. */
 export async function GET(req: Request) {
@@ -11,9 +11,8 @@ export async function GET(req: Request) {
   const raw = new URL(req.url).searchParams.get("u") ?? "";
   let u: URL;
   try { u = new URL(raw); } catch { return new NextResponse("Bad request", { status: 400 }); }
-  if (u.protocol !== "https:" || privateHost(u.hostname)) return new NextResponse("Link tidak diizinkan", { status: 400 });
-  let res: Response;
-  try { res = await fetch(u, { redirect: "follow" }); } catch { return new NextResponse("Gagal mengambil gambar", { status: 502 }); }
+    let res: Response;
+  try { res = await safeFetch(u); } catch (e) { return e instanceof Error && /diizinkan/.test(e.message) ? new NextResponse("Link tidak diizinkan", { status: 400 }) : new NextResponse("Gagal mengambil gambar", { status: 502 }); }
   const type = res.headers.get("content-type") ?? "";
   if (!res.ok || !type.startsWith("image/")) return new NextResponse("Bukan gambar", { status: 415 });
   const buf = Buffer.from(await res.arrayBuffer());

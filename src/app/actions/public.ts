@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { q, tx } from "@/lib/db";
 import { signToken } from "@/lib/auth";
 import { checkConflict, genCode } from "@/lib/bookingUtils";
@@ -11,10 +12,25 @@ import { parseOptions, roomAllowed, unitsFor } from "@/lib/packageUtils";
 type Result = { ok: true; redirect: string } | { ok: false; error: string };
 const fail = (error: string): Result => ({ ok: false, error });
 
+// Per-visitor throttle (in memory, per server instance): the shared "60 pending per hour" cap below could otherwise be filled by one
+// person using made-up phone numbers, which would lock every real customer out.
+const tries = new Map<string, number[]>();
+async function throttled(): Promise<boolean> {
+  const h = await headers();
+  const ip = (h.get("x-forwarded-for")?.split(",")[0] ?? h.get("x-real-ip") ?? "unknown").trim();
+  const now = Date.now();
+  const recent = (tries.get(ip) ?? []).filter((t) => now - t < 10 * 60_000);
+  recent.push(now);
+  tries.set(ip, recent);
+  if (tries.size > 2000) for (const [k, v] of tries) if (!v.some((t) => now - t < 10 * 60_000)) tries.delete(k);
+  return recent.length > 6;
+}
+
 /** Booking dari website. Status "Menunggu" sampai admin menerima DP/konfirmasi. */
 export async function createPublicBooking(fd: FormData): Promise<Result> {
   try {
     if (String(fd.get("website") ?? "")) return fail("Permintaan ditolak."); // honeypot
+    if (await throttled()) return fail("Terlalu banyak percobaan. Coba lagi beberapa menit lagi.");
     const o = await getOnline();
     if (!o.enabled) return fail("Booking online sedang ditutup. Hubungi kami lewat WhatsApp.");
     await expireStalePending();
@@ -37,7 +53,7 @@ export async function createPublicBooking(fd: FormData): Promise<Result> {
          from bookings b join customers c on c.id = b.customer_id
         where b.source = 'website' and b.status = 'pending' and b.created_at > now() - interval '1 hour'`, [digits]);
     if (lim.mine >= 3) return fail("Anda sudah punya beberapa booking yang menunggu. Silakan hubungi kami lewat WhatsApp.");
-    if (lim.all >= 60) return fail("Sedang banyak permintaan. Coba lagi beberapa menit lagi.");
+    if (lim.all >= 150) return fail("Sedang banyak permintaan. Coba lagi beberapa menit lagi.");
 
     const slots = await publicSlots(date, pkgId, wantRoom);
     const slot = slots.find((s) => s.t === time);
