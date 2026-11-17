@@ -19,7 +19,7 @@ export default async function FilePage({ searchParams }: { searchParams: Promise
   const status = sp.status && FILE_STATUS_LABEL[sp.status] ? sp.status : "";
   const term = (sp.q ?? "").trim();
   const files = await q<FileItem>(
-    `select f.*, c.name as customer_name, c.phone as customer_phone, b.code as booking_code
+    `select f.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email, b.code as booking_code
        from customer_files f join customers c on c.id = f.customer_id
        left join bookings b on b.id = f.booking_id
       where ($1 = '' or f.status = $1) and ($2 = '' or c.name ilike $3 or f.title ilike $3 or c.phone ilike $3)

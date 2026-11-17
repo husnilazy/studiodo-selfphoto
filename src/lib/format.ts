@@ -97,3 +97,7 @@ export const waLink = (phone: string, text: string) => {
   if (p.startsWith("0")) p = "62" + p.slice(1);
   return `https://wa.me/${p}?text=${encodeURIComponent(text)}`;
 };
+
+/** Tautan email (membuka aplikasi email di perangkat dengan penerima, subjek, dan pesan terisi). */
+export const emailLink = (to: string, subject: string, body: string) =>
+  `mailto:${encodeURIComponent(to.trim())}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;

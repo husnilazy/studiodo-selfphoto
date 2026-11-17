@@ -3,7 +3,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "./Icon";
 import { toast } from "./Toaster";
-import { waLink } from "@/lib/format";
+import { emailLink, waLink } from "@/lib/format";
 import { dismissFinished, dismissJob, getServerSnapshot, getSnapshot, onDone, retryItems, stopItem, stopJob, subscribe, type Job } from "@/lib/uploadManager";
 
 const bytes = (n: number) => (n >= 1073741824 ? `${(n / 1073741824).toFixed(2)} GB` : n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
@@ -74,6 +74,7 @@ export function JobView({ job: j, speed, compact = false }: { job: Job; speed: n
               <div className="flex flex-wrap gap-1.5">
                 <button className="btn btn-sm !min-h-8" onClick={() => { navigator.clipboard?.writeText(j.share!.url!).then(() => toast("Link disalin"), () => toast("Gagal menyalin", "bad")); }}>Salin link</button>
                 {j.customerPhone && <a className="btn btn-sm btn-primary !min-h-8" target="_blank" rel="noopener noreferrer" href={waLink(j.customerPhone, msg)}>Kirim WhatsApp</a>}
+                <a className="btn btn-sm !min-h-8" href={emailLink("", "Foto & video kamu dari STUDIODO", msg)}>Email</a>
                 <a className="btn btn-sm !min-h-8" target="_blank" rel="noopener noreferrer" href={j.share.url}>Buka folder</a>
               </div>
             </div>

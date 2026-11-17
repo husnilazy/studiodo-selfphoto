@@ -66,6 +66,18 @@ export async function setFileStatus(id: number, status: string, _p: ActionState,
   });
 }
 
+/** Ubah status satu folder sekaligus (semua file di folder customer/sesi itu). */
+export async function setFolderStatus(customerId: number, bookingId: number | null, status: string, _p: ActionState, _fd: FormData) {
+  return safe(async () => {
+    await actionUser();
+    if (!STATUSES.includes(status)) throw new Error("Status tidak valid.");
+    await q("update customer_files set status = $1 where customer_id = $2 and booking_id is not distinct from $3 and (drive_file_id is not null or kind = 'album')", [status, customerId, bookingId]);
+    revalidatePath("/file");
+    revalidatePath("/customer/[id]", "page");
+    revalidatePath("/booking/[id]", "page");
+  });
+}
+
 export async function deleteFile(id: number, _p: ActionState, _fd: FormData) {
   return safe(async () => {
     await actionUser(["owner", "admin"]);

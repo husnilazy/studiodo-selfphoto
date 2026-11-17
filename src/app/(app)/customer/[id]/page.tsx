@@ -28,7 +28,7 @@ export default async function CustomerDetail({ params }: { params: Promise<{ id:
   const [bookings, files] = await Promise.all([
     listBookings({ customerId: id, order: "desc", limit: 100 }),
     q<FileItem>(
-      `select f.*, c.name as customer_name, c.phone as customer_phone, b.code as booking_code from customer_files f
+      `select f.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email, b.code as booking_code from customer_files f
          join customers c on c.id = f.customer_id left join bookings b on b.id = f.booking_id where f.customer_id = $1 order by f.created_at desc`, [id]),
   ]);
   const driveOn = !!(await getConfig());

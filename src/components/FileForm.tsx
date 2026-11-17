@@ -5,6 +5,7 @@ import { FILE_KIND_LABEL, FILE_STATUS_LABEL } from "@/lib/format";
 import { deleteFile, saveFile } from "@/app/actions/customers";
 
 export type FileRow = {
+  drive_file_id?: string | null;
   id: number; customer_id: number; booking_id: number | null; title: string; url: string; kind: string;
   status: string; expires_on: string | null; note: string;
 };

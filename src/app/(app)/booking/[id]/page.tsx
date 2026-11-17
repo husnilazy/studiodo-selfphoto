@@ -43,7 +43,7 @@ export default async function BookingDetail({ params }: { params: Promise<{ id: 
     q<Item>("select id, name, qty, unit_price, amount from booking_items where booking_id = $1 order by id", [id]),
     q<Pay>("select id, kind, method, amount, paid_at, note, voided from payments where booking_id = $1 order by paid_at, id", [id]),
     q<FileItem>(
-      `select f.*, c.name as customer_name, c.phone as customer_phone, b.code as booking_code from customer_files f
+      `select f.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email, b.code as booking_code from customer_files f
          join customers c on c.id = f.customer_id left join bookings b on b.id = f.booking_id where f.booking_id = $1 order by f.created_at desc`, [id]),
     getStudio(),
   ]);
