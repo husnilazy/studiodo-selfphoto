@@ -1,4 +1,5 @@
 import Icon from "./Icon";
+import FolderToggle from "./FolderToggle";
 import Sheet from "./Sheet";
 import { ActionButton } from "./ActionForm";
 import { Badge } from "./ui";
@@ -77,28 +78,23 @@ export default function FileList({
         const url = g.album?.url;
         const msg = `Halo ${h.customer_name ?? ""}, foto/video kamu dari STUDIODO sudah siap ✨\nUnduh semuanya di: ${url ?? ""}\nTerima kasih sudah berfoto di STUDIODO!`;
         return (
-          <details key={g.key} className="group">
-            <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3 p-4 [&::-webkit-details-marker]:hidden">
+          <FolderToggle key={g.key}
+            info={<>
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accentsoft text-accent"><Icon name="folder" /></span>
-              <div className="min-w-0 flex-1 basis-48">
-                <p className="truncate font-semibold">{title}</p>
-                <p className="truncate text-xs text-muted">
-                  {showCustomer && <>{h.customer_name} · </>}{g.photos.length} file{h.booking_code && <> · {h.booking_code}</>}
-                  <span className="text-accent group-open:hidden"> · ketuk untuk lihat isi</span>
-                </p>
-              </div>
+              <span className="min-w-0">
+                <span className="block truncate font-semibold">{title}</span>
+                <span className="block truncate text-xs text-muted">{showCustomer && <>{h.customer_name} · </>}{g.photos.length} file{h.booking_code && <> · {h.booking_code}</>} · ketuk untuk lihat isi</span>
+              </span>
               <Badge tone={TONE[st]}>{FILE_STATUS_LABEL[st]}</Badge>
-              <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                {url && <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-sm" aria-label="Buka folder"><Icon name="external" className="size-4" /> Buka</a>}
-                {url && <Send phone={h.customer_phone} email={h.customer_email} msg={msg} subject="Foto & video kamu dari STUDIODO" />}
-                {st === "proses" && <ActionButton action={setFolderStatus.bind(null, g.customerId, g.bookingId, "siap")}>Tandai Siap</ActionButton>}
-                {st === "siap" && <ActionButton action={setFolderStatus.bind(null, g.customerId, g.bookingId, "terkirim")}>Tandai Terkirim</ActionButton>}
-              </div>
-            </summary>
-            <div className="divide-y divide-line border-t border-line bg-panel2/30">
-              {g.photos.map((p) => <Row key={p.id} f={p} today={today} showCustomer={false} bookings={bookings} child />)}
-            </div>
-          </details>
+            </>}
+            actions={<>
+              {url && <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-sm" aria-label="Buka folder"><Icon name="external" className="size-4" /> Buka</a>}
+              {url && <Send phone={h.customer_phone} email={h.customer_email} msg={msg} subject="Foto & video kamu dari STUDIODO" />}
+              {st === "proses" && <ActionButton action={setFolderStatus.bind(null, g.customerId, g.bookingId, "siap")}>Tandai Siap</ActionButton>}
+              {st === "siap" && <ActionButton action={setFolderStatus.bind(null, g.customerId, g.bookingId, "terkirim")}>Tandai Terkirim</ActionButton>}
+            </>}>
+            {g.photos.map((p) => <Row key={p.id} f={p} today={today} showCustomer={false} bookings={bookings} child />)}
+          </FolderToggle>
         );
       })}
     </div>
