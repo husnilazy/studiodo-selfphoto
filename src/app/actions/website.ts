@@ -28,15 +28,15 @@ export async function saveSite(json: string): Promise<R> {
 
 const MAX = 200 * 1024 * 1024;
 
-/** Siapkan upload media (gambar/video) ke Supabase Storage. */
+/** Siapkan upload media (gambar/video) ke Neon Object Storage. */
 export async function prepareMediaUpload(name: string, mime: string, size: number):
-  Promise<{ ok: true; uploadUrl: string; publicUrl: string; anonKey: string } | { ok: false; error: string }> {
+  Promise<{ ok: true; uploadUrl: string; publicUrl: string; contentType: string; cacheControl: string } | { ok: false; error: string }> {
   try {
     await actionUser(["owner", "admin"]);
-    if (!storageReady()) throw new Error("Upload belum diaktifkan. Tempel link media, atau isi SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY.");
+    if (!storageReady()) throw new Error("Upload belum diaktifkan. Tempel link media, atau pasang bucket Neon (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_ENDPOINT_URL_S3).");
     if (!/^(image|video)\//.test(mime)) throw new Error("Hanya gambar atau video yang bisa diunggah.");
     if (size > MAX) throw new Error("File terlalu besar (maks 200 MB).");
-    return { ok: true, ...(await createSignedMediaUpload(name)) };
+    return { ok: true, ...(await createSignedMediaUpload(name, mime)) };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Gagal menyiapkan upload." };
   }

@@ -13,13 +13,13 @@ const CATS = ["strip", "4r", "square", "story", "lainnya"];
 
 /** Siapkan upload gambar (semua staf boleh memakai editor). */
 export async function prepareStudioUpload(name: string, mime: string, size: number):
-  Promise<{ ok: true; uploadUrl: string; publicUrl: string; anonKey: string } | { ok: false; error: string }> {
+  Promise<{ ok: true; uploadUrl: string; publicUrl: string; contentType: string; cacheControl: string } | { ok: false; error: string }> {
   try {
     await actionUser();
-    if (!storageReady()) throw new Error("Upload belum aktif di server (Supabase Storage belum diisi).");
+    if (!storageReady()) throw new Error("Upload belum aktif di server (Neon Object Storage belum diisi).");
     if (!/^image\//.test(mime)) throw new Error("Hanya file gambar yang bisa diunggah.");
     if (size > MAX_UPLOAD) throw new Error("File terlalu besar (maks 60 MB).");
-    return { ok: true, ...(await createSignedMediaUpload(name)) };
+    return { ok: true, ...(await createSignedMediaUpload(name, mime)) };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Gagal menyiapkan upload." };
   }

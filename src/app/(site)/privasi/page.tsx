@@ -64,7 +64,7 @@ export default async function PrivacyPage() {
               <p>Untuk menjalankan layanan, kami memakai penyedia berikut. Mereka hanya memproses data sebatas yang diperlukan untuk fungsi tersebut:</p>
               <ul>
                 <li><b>Vercel</b> — hosting situs dan aplikasi.</li>
-                <li><b>Supabase</b> — basis data pemesanan dan pembukuan.</li>
+                <li><b>Neon</b> — basis data pemesanan dan pembukuan, serta penyimpanan gambar situs.</li>
                 <li><b>Google Drive</b> — penyimpanan hasil foto dan video.</li>
                 <li><b>WhatsApp</b> — komunikasi dengan pelanggan.</li>
               </ul>

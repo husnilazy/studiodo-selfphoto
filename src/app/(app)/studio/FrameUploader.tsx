@@ -64,7 +64,7 @@ export default function FrameUploader({ storage }: { storage: boolean }) {
   const save = async () => {
     if (!scan || !file) return;
     setErr("");
-    if (!storage) { setErr("Upload belum aktif di server (Supabase Storage). Aktifkan dulu agar frame bisa disimpan."); return; }
+    if (!storage) { setErr("Upload belum aktif di server (Neon Object Storage). Aktifkan dulu agar frame bisa disimpan."); return; }
     if (!name.trim()) { setErr("Beri nama frame."); return; }
     if (!slots.length) { setErr("Tidak ada slot foto. Pastikan area foto berwarna hijau polos (mis. #00FF00), atau naikkan toleransi."); return; }
     setBusy("Mengunggah frame…"); setPct(0);

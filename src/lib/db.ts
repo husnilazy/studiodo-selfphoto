@@ -2,7 +2,7 @@ import "server-only";
 import { SCHEMA, SCHEMA_VERSION } from "@/db/schema";
 
 // Satu antarmuka untuk dua mesin:
-//  - DATABASE_URL terisi  -> PostgreSQL sungguhan (Supabase) lewat `pg`
+//  - DATABASE_URL terisi  -> PostgreSQL sungguhan (Neon) lewat `pg`
 //  - kosong               -> PGlite (Postgres tertanam) di folder .data, untuk development lokal
 export type Q = <T = any>(sql: string, params?: any[]) => Promise<T[]>;
 

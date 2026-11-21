@@ -308,7 +308,7 @@ export default function EditorApp({ initial, designId: initialId, frames, storag
     try {
       const d: Design = JSON.parse(JSON.stringify(docRef.current));
       const blobs = [...new Set(d.pages.flatMap((p) => p.layers).flatMap((l) => ((l.type === "photo" || l.type === "frame") && l.src.startsWith("blob:") ? [l.src] : [])))];
-      if (blobs.length && !storage) throw new Error("Upload belum aktif di server, foto dari perangkat tidak bisa disimpan. Pakai foto customer, atau aktifkan Supabase Storage.");
+      if (blobs.length && !storage) throw new Error("Upload belum aktif di server, foto dari perangkat tidak bisa disimpan. Pakai foto customer, atau aktifkan Neon Object Storage.");
       let thumb = "";
       if (storage) {
         const c = await renderToCanvas(d.pages[0], 540, Math.round((540 * d.pages[0].h) / d.pages[0].w), "contain", "#ffffff");
