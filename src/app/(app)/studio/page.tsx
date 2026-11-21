@@ -81,7 +81,7 @@ export default async function StudioPage({ searchParams }: { searchParams: Promi
         { key: "frame", label: `Frame (${frames.length})`, href: "/studio?tab=frame" },
         { key: "file", label: "File Ekspor", href: "/studio?tab=file" },
       ]} />
-      {!storage && <p className="mb-4 rounded-xl bg-warnsoft px-4 py-3 text-sm font-semibold text-warn">Supabase Storage belum aktif di server: foto dari perangkat, frame, dan hasil ekspor tidak bisa disimpan online. Foto customer dan unduh langsung tetap bisa dipakai.</p>}
+      {!storage && <p className="mb-4 rounded-xl bg-warnsoft px-4 py-3 text-sm font-semibold text-warn">Neon Object Storage belum aktif di server: foto dari perangkat, frame, dan hasil ekspor tidak bisa disimpan online. Foto customer dan unduh langsung tetap bisa dipakai.</p>}
 
       {tab === "desain" && (
         <section>

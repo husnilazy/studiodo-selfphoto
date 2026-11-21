@@ -103,7 +103,7 @@ function HeadingFields({ h, onChange }: { h: Heading; onChange: (fn: (h: Heading
   );
 }
 
-/** Isian link media dengan tombol upload (Supabase Storage) bila diaktifkan. */
+/** Isian link media dengan tombol upload (Neon Object Storage) bila diaktifkan. */
 function MediaField({ label, value, onChange, accept = "image", storage, hint }: { label: string; value: string; onChange: (v: string) => void; accept?: "image" | "video" | "any"; storage: boolean; hint?: string }) {
   const input = useRef<HTMLInputElement>(null);
   const [pct, setPct] = useState<number | null>(null);
@@ -412,8 +412,7 @@ function Gallery({ cfg, upd, storage }: { cfg: SiteConfig; upd: Upd; storage: bo
       setBusy(`Mengunggah ${n + 1}/${files.length}…`);
       const p = await prepareMediaUpload(f.name, f.type, f.size);
       if (!p.ok) { setBusy(p.error); return; }
-      const fd = new FormData(); fd.append("cacheControl", "31536000"); fd.append("", f);
-      const ok = await fetch(p.uploadUrl, { method: "PUT", headers: { apikey: p.anonKey, Authorization: `Bearer ${p.anonKey}`, "x-upsert": "false" }, body: fd }).then((r) => r.ok).catch(() => false);
+      const ok = await fetch(p.uploadUrl, { method: "PUT", headers: { "Content-Type": p.contentType, "Cache-Control": p.cacheControl }, body: f }).then((r) => r.ok).catch(() => false);
       if (!ok) { setBusy("Upload gagal."); return; }
       upd((d) => { if (d.gallery.items.length < 24) d.gallery.items.push({ url: p.publicUrl, caption: "" }); });
     }

@@ -1,4 +1,4 @@
-// Menjalankan skema ke database di DATABASE_URL (Supabase). Aman diulang.
+// Menjalankan skema ke database di DATABASE_URL (Neon). Aman diulang.
 import pg from "pg";
 import { SCHEMA } from "../src/db/schema.ts";
 

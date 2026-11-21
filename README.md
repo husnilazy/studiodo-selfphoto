@@ -1,7 +1,7 @@
 # STUDIODO Kasir
 
 Aplikasi kasir & manajemen untuk STUDIODO (self photo studio, photobox, photobooth).
-Next.js 16 + PostgreSQL (Supabase) — responsif untuk HP, bisa di-install sebagai PWA.
+Next.js 16 + PostgreSQL & Object Storage (Neon) — responsif untuk HP, bisa di-install sebagai PWA.
 
 ## Fitur
 - **Login PIN 6 digit** per pengguna (Owner / Admin / Kasir), kunci otomatis 5 menit setelah 5x salah.
@@ -21,7 +21,7 @@ Pendapatan diakui saat uang diterima (basis kas).
 - **Website (CMS)** di menu admin: logo & favicon, warna brand, bar pengumuman, hero (strip foto / video / foto, bingkai atau latar penuh),
   statistik animasi, teks berjalan, reels & video (MP4, YouTube, Drive, Instagram/TikTok), galeri + lightbox, testimoni,
   urutan & judul tiap section, lokasi + Google Maps embed, FAQ, footer & SEO. Ada pratinjau HP/desktop.
-- Upload gambar/video langsung dari CMS (opsional): isi `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`. Bucket `website` dibuat otomatis.
+- Upload gambar/video langsung dari CMS (opsional): butuh bucket Neon Object Storage (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL_S3`, `AWS_REGION`; dibuat oleh `neon deploy` dari `neon.ts`). File dilayani lewat `/media/*` (di-proxy dan di-cache CDN Vercel).
   Tanpa itu, tempel link media (Google Drive, YouTube, dll.).
 - **Sesi Live**: papan monitoring per ruang (hitung mundur, +10/+15 menit, Mulai/Selesai, tidak hadir, antrean, perlu tindakan, mode layar penuh).
 
@@ -33,15 +33,19 @@ npm run dev        # http://localhost:3000
 Tanpa `DATABASE_URL`, aplikasi memakai database lokal (PGlite) di folder `.data` — hapus folder itu untuk mengulang dari nol.
 Buka aplikasi → layar **Setup Awal** akan meminta nama & PIN Owner.
 
-## Pasang di Supabase + Vercel
-1. Supabase → New project → **Project Settings → Database → Connection string → Transaction pooler** (port 6543). Salin URI-nya.
-2. Vercel → Import project → Environment Variables:
-   - `DATABASE_URL` = URI Supabase di atas (isi password database)
+## Pasang di Neon + Vercel
+1. Buat project Neon di region **Singapore** (`aws-ap-southeast-1`), lalu dari folder ini: `neon link`, `neon deploy` (membuat bucket `website` dari `neon.ts`) dan `neon env pull` (mengisi `.env.local`).
+2. Izinkan upload langsung dari browser: `node --env-file=.env.local scripts/neon-bucket-cors.mjs https://kasir.studiodo.id https://selfphoto.studiodo.id`
+3. Vercel → Environment Variables:
+   - `DATABASE_URL` = connection string **pooled** Neon
+   - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL_S3`, `AWS_REGION` = dari `.env.local`
+   - `MEDIA_BASE_URL` = asal publik situs, mis. `https://selfphoto.studiodo.id` (URL media jadi `<asal>/media/<file>`)
    - `SESSION_SECRET` = string acak panjang (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`)
-3. Deploy. Tabel dibuat otomatis saat pertama kali diakses. (Opsional: `npm run db:migrate` dengan `.env.local` terisi.)
-4. Buka URL → buat akun Owner → tambah Admin/Kasir di **Pengaturan**.
+4. Deploy. Tabel dibuat otomatis saat pertama kali diakses. (Opsional: `npm run db:migrate`.)
+5. Buka URL → buat akun Owner → tambah Admin/Kasir di **Pengaturan**.
 
-Semua tabel memakai Row Level Security tanpa policy, jadi API publik Supabase (anon key) tidak bisa membaca data; hanya server aplikasi.
+### Pindah dari Supabase
+`scripts/migrate-from-supabase.mjs` menyalin semua tabel, file media, dan menulis ulang URL media di database. Isi `SOURCE_DATABASE_URL` (connection string Postgres Supabase) dan `MEDIA_BASE_URL`, lalu jalankan `node --env-file=.env.local scripts/migrate-from-supabase.mjs --dry` (cek) dan tanpa `--dry` (sungguhan). Supabase harus aktif (tidak terkena 402) selama file media disalin.
 
 ## Mulai memakai (urutan disarankan)
 1. Pengaturan: nama studio, jam buka/tutup, interval slot.
