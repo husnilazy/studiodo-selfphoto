@@ -424,3 +424,65 @@ nav.no-print.fixed { background: color-mix(in oklab, var(--panel) 86%, transpare
 .confirm-danger { background: linear-gradient(180deg, #f2626a, #d92d3a) !important; border-color: transparent !important; color: #fff !important; box-shadow: 0 8px 24px -8px rgba(217,45,58,.75), inset 0 1px 0 rgba(255,255,255,.25) !important; }
 .confirm-danger:hover { box-shadow: 0 12px 30px -8px rgba(217,45,58,.95), inset 0 1px 0 rgba(255,255,255,.3) !important; }
 @media (prefers-reduced-motion: reduce) { .confirm-panel, .confirm-bg { animation: none !important; } }
+
+/* ───────── Alur langkah beranimasi (beranda: Cara Booking) ───────── */
+.sf-item { transition: transform .5s cubic-bezier(.2,.8,.2,1); }
+.sf-item[data-cur="true"] { transform: translateY(-6px); }
+.sf-card { transition: border-color .5s ease, box-shadow .5s ease; }
+.sf-item[data-on="true"] .sf-card { border-color: color-mix(in oklab, var(--accent) 45%, var(--line)); }
+.sf-item[data-cur="true"] .sf-card { box-shadow: 0 26px 56px -26px var(--accent); }
+
+.sf-ico { background: var(--accent-soft); color: var(--accent); transition: background-color .5s ease, color .5s ease, box-shadow .5s ease; }
+.sf-item[data-on="true"] .sf-ico { background: var(--accent); color: var(--accent-fg); box-shadow: 0 10px 26px -8px var(--accent); }
+.sf-item[data-cur="true"] .sf-ico { animation: sf-pop .65s cubic-bezier(.3,1.5,.5,1); }
+.sf-ico::after { content: ""; position: absolute; inset: 0; border-radius: inherit; border: 2px solid var(--accent); opacity: 0; pointer-events: none; }
+.sf-item[data-cur="true"] .sf-ico::after { animation: sf-ring 1.8s ease-out infinite; }
+@keyframes sf-pop { 0% { transform: scale(.7) rotate(-10deg); } 60% { transform: scale(1.18) rotate(4deg); } 100% { transform: none; } }
+@keyframes sf-ring { 0% { transform: scale(1); opacity: .65; } 100% { transform: scale(1.9); opacity: 0; } }
+
+.sf-flash { position: absolute; inset: -60%; border-radius: 999px; background: radial-gradient(circle, #fff 0%, rgba(255,255,255,.55) 28%, transparent 62%); opacity: 0; pointer-events: none; z-index: 20; mix-blend-mode: screen; }
+.sf-item[data-cur="true"] .sf-flash { animation: sf-flash .8s .35s ease-out both; }
+@keyframes sf-flash { 0% { opacity: 0; transform: scale(.3); } 18% { opacity: .95; transform: scale(1); } 100% { opacity: 0; transform: scale(1.6); } }
+
+.sf-num { color: var(--line); transition: color .5s ease, transform .5s cubic-bezier(.3,1.4,.5,1); transform-origin: right center; }
+.sf-item[data-on="true"] .sf-num { color: color-mix(in oklab, var(--accent) 55%, var(--line)); }
+.sf-item[data-cur="true"] .sf-num { color: var(--accent); transform: scale(1.14); }
+
+/* Garis penghubung: vertikal di HP, horizontal di layar lebar (di celah antar kartu) */
+.sf-link { left: 2.9rem; top: 100%; width: 2px; height: 1.25rem; background: var(--line); border-radius: 2px; overflow: hidden; }
+@media (min-width: 1024px) { .sf-link { left: 100%; top: 3rem; width: 1.25rem; height: 2px; } }
+.sf-fill { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transform: scaleY(0); transform-origin: top; transition: transform .6s cubic-bezier(.2,.8,.2,1); }
+@media (min-width: 1024px) { .sf-fill { transform: scaleX(0); transform-origin: left; } }
+.sf-fill[data-on="true"] { transform: scale(1); }
+@media (prefers-reduced-motion: reduce) { .sf-item, .sf-ico, .sf-num { animation: none !important; transform: none !important; } .sf-flash, .sf-ico::after { display: none; } }
+
+/* ───────── Gaya Solid (landing): datar, tanpa gradien/blur/glow ───────── */
+.site[data-style="solid"]::before { background: var(--bg); }
+.site[data-style="solid"] .orb, .site[data-style="solid"] .spot::after { display: none !important; }
+.site[data-style="solid"] .glass { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--panel); border: 1px solid var(--line); box-shadow: none; }
+.site[data-style="solid"] .grad-text { background: none; -webkit-background-clip: initial; background-clip: initial; color: var(--accent); animation: none; }
+.site[data-style="solid"] .btn-primary { background: var(--accent) !important; color: var(--accent-fg) !important; border-color: transparent !important; box-shadow: none !important; }
+.site[data-style="solid"] .btn-primary:hover { filter: brightness(.94); }
+.site[data-style="solid"] .btn:not(.btn-primary) { background: var(--panel); border-color: var(--line); color: var(--fg); box-shadow: none; }
+.site[data-style="solid"] .btn-glow, .site[data-style="solid"] .btn-glow:hover { box-shadow: none !important; }
+.site[data-style="solid"] .lift:hover { box-shadow: 0 14px 30px -20px color-mix(in oklab, var(--fg) 35%, transparent); border-color: color-mix(in oklab, var(--accent) 45%, var(--line)); }
+.site[data-style="solid"] .cta-bg { background: var(--accent) !important; animation: none; }
+.site[data-style="solid"] .deal-strip { background: var(--accent) !important; animation: none; }
+.site[data-style="solid"] .site-fallback { background: color-mix(in oklab, var(--accent) 22%, var(--panel)) !important; }
+.site[data-style="solid"] [class*="from-rose-500"] { background-image: none !important; background-color: #e11d48; }
+.site[data-style="solid"] [class*="from-amber-400"] { background-image: none !important; background-color: #fbbf24; }
+.site[data-style="solid"] [class*="backdrop-blur"] { -webkit-backdrop-filter: none; backdrop-filter: none; }
+.site[data-style="solid"] .chip[data-on="true"], .site[data-style="solid"] .nav-pill { background: var(--accent) !important; color: var(--accent-fg) !important; box-shadow: none !important; }
+.site[data-style="solid"] .site-announce { background: var(--fg) !important; color: var(--bg) !important; }
+.site[data-style="solid"] .site-announce a { background: color-mix(in oklab, var(--bg) 22%, transparent); }
+.site[data-style="solid"] h1, .site[data-style="solid"] h2, .site[data-style="solid"] h3, .site[data-style="solid"] .font-display { letter-spacing: -.015em; }
+
+/* Menu atas: pil mengambang berwarna aksen */
+.site[data-style="solid"] .nav-base, .site[data-style="solid"] .nav-glass { background: transparent; border-bottom-color: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.site[data-style="solid"] .site-navbar { --fg: var(--accent-fg); --muted: color-mix(in oklab, var(--accent-fg) 80%, var(--accent)); margin-top: .75rem; border-radius: 999px; background: var(--accent); color: var(--accent-fg); padding-inline: 1.25rem; box-shadow: 0 14px 30px -18px color-mix(in oklab, var(--fg) 55%, transparent); }
+.site[data-style="solid"] .site-navbar nav a { color: var(--muted); }
+.site[data-style="solid"] .site-navbar nav a:hover, .site[data-style="solid"] .site-navbar nav a[aria-current] { color: var(--accent-fg); }
+.site[data-style="solid"] .site-navbar nav > span { background: color-mix(in oklab, var(--accent-fg) 20%, transparent); --tw-ring-shadow: 0 0 #0000; box-shadow: none; }
+.site[data-style="solid"] .site-navbar .btn-primary { background: var(--accent-fg) !important; color: var(--accent) !important; }
+.site[data-style="solid"] .site-navbar .btn:not(.btn-primary) { background: color-mix(in oklab, var(--accent-fg) 18%, transparent); border-color: transparent; color: var(--accent-fg); }
+.site[data-style="solid"] > main:first-of-type { padding-top: 1.25rem; }

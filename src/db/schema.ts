@@ -1,7 +1,7 @@
 // Skema database STUDIODO Kasir (PostgreSQL / Neon). Idempotent: aman dijalankan berulang.
 // Semua nilai uang disimpan sebagai bigint rupiah (tanpa desimal).
 // NAIKKAN versi ini setiap kali SCHEMA diubah agar database yang sudah ada ikut ter-upgrade.
-export const SCHEMA_VERSION = "2026-11-17.1";
+export const SCHEMA_VERSION = "2026-11-22.5";
 
 export const SCHEMA = `
 create table if not exists users (
@@ -223,6 +223,8 @@ alter table customer_files add column if not exists drive_file_id text;
 
 -- Website & booking online
 alter table rooms add column if not exists image_url text not null default '';
+-- Foto tambahan ruang/background (slide). image_url tetap foto sampul/pertama.
+alter table rooms add column if not exists images jsonb not null default '[]'::jsonb;
 
 -- Harga per orang, paket khusus walk-in, pilihan varian (warna/tema), dan pembatasan ruang per paket
 alter table packages add column if not exists per_person boolean not null default false;
@@ -251,6 +253,23 @@ alter table packages add column if not exists image_x int not null default 50;
 alter table packages add column if not exists image_y int not null default 50;
 -- Foto tambahan kartu paket (slide). image_url tetap foto sampul/pertama.
 alter table packages add column if not exists images jsonb not null default '[]'::jsonb;
+
+-- Paket grup & aturan jumlah orang: minimal orang, orang yang sudah termasuk di harga sesi + tarif tiap orang tambahan, penanda grup, label kartu.
+alter table packages add column if not exists min_people int not null default 1;
+alter table packages add column if not exists included_people int not null default 0;
+alter table packages add column if not exists extra_person_price bigint not null default 0;
+alter table packages add column if not exists is_group boolean not null default false;
+alter table packages add column if not exists badge text not null default '';
+alter table packages add column if not exists position int not null default 0; -- urutan manual dari admin (kecil = lebih dulu)
+
+-- Sewa event (mis. photobooth): harga untuk durasi dasar (base_hours), tarif tiap jam tambahan, batas jam, dan pilihan output ("label|selisih harga" per baris).
+alter table packages add column if not exists is_event boolean not null default false;
+alter table packages add column if not exists base_hours int not null default 0;
+alter table packages add column if not exists extra_hour_price bigint not null default 0;
+alter table packages add column if not exists max_hours int not null default 0;
+alter table packages add column if not exists outputs text not null default '';
+-- Tambahan berbayar & bonus FREE sewa event, satu per baris: "nama|harga|free|minimal jam".
+alter table packages add column if not exists event_addons text not null default '';
 
 -- Promo, member, voucher
 create table if not exists promos (

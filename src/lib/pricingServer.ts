@@ -1,5 +1,6 @@
 import "server-only";
 import { q as rootQ, type Q } from "./db";
+import { packageBase } from "./packageUtils";
 import {
   bestPromo, computeQuote, memberBenefit, sanitizeMember, tierFor, isMemberNow, nextIsReward, visitsToReward, voucherAmount,
   type MemberCfg, type Promo, type PromoPkg, type Quote, type Voucher,
@@ -86,8 +87,8 @@ export type QuoteResult = Quote & {
 
 /** Hitung harga akhir: promo / member (otomatis) + voucher + diskon manual. Selalu dihitung ulang di server. */
 export async function buildQuote(q: Q, i: QuoteInput): Promise<QuoteResult> {
-  const [pk] = i.packageId ? await q<PromoPkg>("select id, category, price, per_person from packages where id = $1", [i.packageId]) : [null];
-  const pkg = pk ? { ...pk, price: Number(pk.price) } : null;
+  const [pk] = i.packageId ? await q<PromoPkg>("select id, category, price, per_person, included_people, extra_person_price from packages where id = $1", [i.packageId]) : [null];
+  const pkg = pk ? { ...pk, price: Number(pk.price), extra_person_price: Number(pk.extra_person_price ?? 0) } : null;
   const people = Math.max(1, i.people);
   const auto = i.auto !== false;
   const [promos, cfg, cust] = await Promise.all([
@@ -100,7 +101,7 @@ export async function buildQuote(q: Q, i: QuoteInput): Promise<QuoteResult> {
 
   let voucher: Voucher | null = null, voucherError = "";
   if (i.voucherCode?.trim()) {
-    const base = pkg ? pkg.price * (pkg.per_person ? people : 1) : 0;
+    const base = pkg ? packageBase(pkg, people) : 0;
     try {
       voucher = await validateVoucher(q, i.voucherCode, { pkg, people, subtotal: base + i.extras, customerId: cust.id, isMember: isMemberNow(cfg, cust), excludeBookingId: i.excludeBookingId, now });
     } catch (e) { voucherError = e instanceof Error ? e.message : "Voucher tidak valid."; }

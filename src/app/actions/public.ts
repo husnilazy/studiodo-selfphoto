@@ -1,4 +1,5 @@
 "use server";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { q, tx } from "@/lib/db";
 import { signToken } from "@/lib/auth";
@@ -6,7 +7,7 @@ import { checkConflict, genCode } from "@/lib/bookingUtils";
 import { expireStalePending, getOnline, publicSlots } from "@/lib/online";
 import { fromWIB } from "@/lib/format";
 import { buildQuote } from "@/lib/pricingServer";
-import { parseOptions, roomAllowed, unitsFor } from "@/lib/packageUtils";
+import { itemName, itemUnitPrice, parseOptions, roomAllowed, unitsFor } from "@/lib/packageUtils";
 
 type Result = { ok: true; redirect: string } | { ok: false; error: string };
 const fail = (error: string): Result => ({ ok: false, error });
@@ -45,15 +46,16 @@ export async function createPublicBooking(fd: FormData): Promise<Result> {
 
     let option = "";
     const id = await tx(async (t) => {
-      const [pkg] = await t<{ id: number; name: string; price: number; category: string; duration_min: number; max_people: number; per_person: boolean; option_label: string; options: string }>(
-        "select id, name, price, category, duration_min, max_people, per_person, option_label, options from packages where id = $1 and active and bookable_online", [pkgId]);
+      const [pkg] = await t<{ id: number; name: string; price: number; category: string; duration_min: number; max_people: number; per_person: boolean; option_label: string; options: string; min_people: number; included_people: number; extra_person_price: number }>(
+        "select id, name, price, category, duration_min, max_people, per_person, option_label, options, min_people, included_people, extra_person_price from packages where id = $1 and active and bookable_online", [pkgId]);
       if (!pkg) throw new Error("Paket ini tidak bisa dipesan online. Silakan hubungi kami.");
       const guests = Math.min(people, pkg.max_people);
+      if (guests < pkg.min_people) throw new Error(`Paket ${pkg.name} minimal ${pkg.min_people} orang.`);
       const opts = parseOptions(pkg.options);
       option = opts.length ? String(fd.get("option_choice") ?? "") : "";
       if (opts.length && !opts.includes(option)) throw new Error(`Pilih ${pkg.option_label || "varian"} terlebih dulu.`);
       const allowed = (await t<{ room_id: number }>("select room_id from package_rooms where package_id = $1", [pkg.id])).map((r) => r.room_id);
-      const items = [{ kind: "package", ref_id: pkg.id, name: pkg.name, qty: unitsFor(pkg, guests), unit_price: pkg.price, category: pkg.category }];
+      const items = [{ kind: "package", ref_id: pkg.id, name: itemName(pkg.name, pkg, guests), qty: unitsFor(pkg, guests), unit_price: itemUnitPrice(pkg, guests), category: pkg.category }];
       for (const [k, v] of fd.entries()) {
         const m = /^addon_(\d+)$/.exec(k);
         const qty = Math.min(20, parseInt(String(v), 10) || 0);
@@ -98,4 +100,29 @@ export async function createPublicBooking(fd: FormData): Promise<Result> {
     console.error(e);
     return fail(e instanceof Error && !/ECONN|timeout|relation|syntax/i.test(e.message) ? e.message : "Terjadi gangguan. Coba lagi sebentar.");
   }
+}
+
+/* ───────── Cek status booking (nomor WhatsApp + kode booking) ───────── */
+// Pembatas percobaan (per instance): maks 8 gagal / 15 menit per nomor atau per IP.
+const lookupFails = new Map<string, number[]>();
+const lookupBlocked = (k: string) => { const now = Date.now(); const a = (lookupFails.get(k) ?? []).filter((t) => now - t < 15 * 60_000); lookupFails.set(k, a); return a.length >= 8; };
+const lookupBump = (k: string) => lookupFails.set(k, [...(lookupFails.get(k) ?? []), Date.now()]);
+
+/** Pelanggan membuka halaman status bookingnya sendiri. Mengembalikan tautan halaman status bertanda tangan. */
+export async function findBooking(phone: string, codeRaw: string): Promise<Result> {
+  const d = String(phone ?? "").replace(/\D/g, "");
+  const code = String(codeRaw ?? "").toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 24);
+  if (d.length < 9) return fail("Nomor WhatsApp tidak valid.");
+  if (!code) return fail("Masukkan kode booking.");
+  const ip = ((await headers()).get("x-forwarded-for") ?? "").split(",")[0].trim() || "ip";
+  const kPhone = `b:${d.slice(-9)}`, kIp = `bi:${ip}`;
+  if (lookupBlocked(kPhone) || lookupBlocked(kIp)) return fail("Terlalu banyak percobaan. Coba lagi 15 menit lagi.");
+  const rows = await q<{ code: string }>(
+    `select b.code from bookings b join customers c on c.id = b.customer_id
+      where upper(b.code) = $1 and right(regexp_replace(c.phone, '\D', '', 'g'), 9) = $2 limit 1`, [code, d.slice(-9)]);
+  if (!rows.length) {
+    lookupBump(kPhone); lookupBump(kIp);
+    return fail("Nomor WhatsApp dan kode booking tidak cocok. Periksa pesan konfirmasi atau struk kamu.");
+  }
+  return { ok: true, redirect: `/book/selesai?c=${rows[0].code}&t=${signToken(rows[0].code)}` };
 }

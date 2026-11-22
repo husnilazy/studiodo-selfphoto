@@ -1,5 +1,5 @@
 // Mesin harga: diskon promo, member, voucher. Murni (tanpa database) — aman dipakai server & client.
-import { unitsFor } from "./packageUtils";
+import { packageBase, unitsFor } from "./packageUtils";
 
 export type PromoKind = "percent" | "amount_unit" | "amount_total" | "free_units";
 export type Promo = {
@@ -8,7 +8,7 @@ export type Promo = {
   starts_at: string | null; ends_at: string | null;
   show_countdown: boolean; show_on_site: boolean; active: boolean;
 };
-export type PromoPkg = { id: number; category: string; price: number; per_person: boolean };
+export type PromoPkg = { id: number; category: string; price: number; per_person: boolean; included_people?: number; extra_person_price?: number };
 
 export const PROMO_KIND_LABEL: Record<PromoKind, string> = {
   percent: "Persen (%)", amount_unit: "Potongan per orang/unit (Rp)", amount_total: "Potongan total (Rp)", free_units: "Gratis N orang/unit",
@@ -29,7 +29,7 @@ const clampInt = (n: number) => Math.max(0, Math.round(n));
 /** Nilai potongan sebuah promo pada paket + jumlah orang tertentu (0 bila syarat belum terpenuhi). */
 export function promoAmount(p: Pick<Promo, "kind" | "value" | "min_people">, pkg: PromoPkg, people: number): number {
   if (people < Math.max(1, p.min_people)) return 0;
-  const units = unitsFor(pkg, people), base = pkg.price * units;
+  const units = unitsFor(pkg, people), base = packageBase(pkg, people);
   switch (p.kind) {
     case "percent": return clampInt(base * Math.min(100, p.value) / 100);
     case "amount_unit": return clampInt(Math.min(p.value, pkg.price) * units);
@@ -101,7 +101,7 @@ export const visitsToReward = (cfg: MemberCfg, visits: number) => (cfg.reward_ev
 
 export function memberBenefit(cfg: MemberCfg, c: { is_member: boolean; visits: number }, pkg: PromoPkg, people: number) {
   if (!isMemberNow(cfg, c)) return null;
-  const units = unitsFor(pkg, people), base = pkg.price * units;
+  const base = packageBase(pkg, people);
   const tier = tierFor(cfg, c.visits);
   const tierAmt = tier ? clampInt(base * tier.percent / 100) : 0;
   const rewardAmt = nextIsReward(cfg, c.visits) ? clampInt(pkg.price * cfg.reward_percent / 100) : 0;
@@ -133,7 +133,7 @@ export function computeQuote(i: {
   member: { label: string; amount: number } | null;
   voucher: Voucher | null; manual?: number;
 }): Quote {
-  const packageAmount = i.pkg ? i.pkg.price * unitsFor(i.pkg, i.people) : 0;
+  const packageAmount = i.pkg ? packageBase(i.pkg, i.people) : 0;
   const subtotal = packageAmount + i.extras;
   const lines: DiscountLine[] = [];
   let auto: DiscountLine | null = null;

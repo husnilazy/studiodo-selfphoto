@@ -18,8 +18,20 @@ export const SECTION_LABEL: Record<SectionKey, string> = {
 };
 export const SECTION_KEYS = Object.keys(SECTION_LABEL) as SectionKey[];
 
-export type Heading = { enabled: boolean; eyebrow: string; title: string; subtitle: string };
+export const GALLERY_MAX = 80;
+
+/** Palet siap pakai untuk gaya Solid: [nama, latar, kartu, teks, aksen]. */
+export const SOLID_PRESETS: [string, string, string, string, string][] = [
+  ["Krem & Merah", "#f6efe6", "#fbf7f1", "#2a1f1a", "#b9272d"],
+  ["Putih & Biru", "#ffffff", "#f3f5fa", "#0b1020", "#1769ff"],
+  ["Sage & Hijau", "#eff2e9", "#f9faf5", "#1f2d1e", "#4a6b3a"],
+  ["Blush & Plum", "#fbeef0", "#fff8f8", "#3a1a2a", "#8c2f5b"],
+  ["Hitam & Kuning", "#111111", "#1c1c1c", "#f5f2ea", "#f5c518"],
+];
+export type Heading ={ enabled: boolean; eyebrow: string; title: string; subtitle: string };
 export type SiteConfig = {
+  /** mode "solid": tanpa gradien/blur/glow, warna latar-kartu-teks diatur sendiri (aksen = brand.accent). */
+  style: { mode: "gradient" | "solid"; bg: string; panel: string; fg: string; display_font: FontKey };
   brand: { logo_url: string; logo_dark_url: string; favicon_url: string; logo_height: number; show_name: boolean; text: string; text_size: number; text_font: FontKey; accent: string; accent2: string };
   announce: { enabled: boolean; text: string; link: string; link_label: string };
   hero: {
@@ -27,12 +39,14 @@ export type SiteConfig = {
     media_type: "strips" | "video" | "image"; media_layout: "frame" | "background"; media_url: string; poster_url: string; overlay: number;
     strip_photos: string[]; // 3 strip × 3 foto, urut kiri-ke-kanan lalu atas-ke-bawah
   };
-  stats: { items: { value: string; label: string }[] };
+  /** live = bila item kosong, tampilkan angka nyata (sesi selesai, orang berfoto) dari data kasir. */
+  stats: { live: boolean; items: { value: string; label: string }[] };
   marquee: { enabled: boolean; words: string[] };
   reels: Heading & { items: { title: string; url: string; poster_url: string; link: string }[] };
   layanan: Heading;
   background: Heading;
-  gallery: Heading & { items: { url: string; caption: string }[] };
+  /** package_id 0 = umum (tidak terkait paket tertentu). */
+  gallery: Heading & { items: { url: string; caption: string; package_id: number }[] };
   cara: Heading;
   testimoni: Heading & { items: { name: string; role: string; text: string; rating: number; avatar_url: string }[] };
   lokasi: Heading & { address: string; hours_note: string; maps_embed: string; photo_url: string; whatsapp: string; instagram: string; maps_url: string };
@@ -46,6 +60,7 @@ export type SiteConfig = {
 const H = (eyebrow: string, title: string, subtitle = ""): Heading => ({ enabled: true, eyebrow, title, subtitle });
 
 export const DEFAULT_SITE: SiteConfig = {
+  style: { mode: "gradient", bg: "#f6efe6", panel: "#fbf7f1", fg: "#2a1f1a", display_font: "playfair" },
   brand: { logo_url: "", logo_dark_url: "", favicon_url: "", logo_height: 32, show_name: true, text: "", text_size: 16, text_font: "sora", accent: "#4f4fe8", accent2: "#a78bfa" },
   announce: { enabled: false, text: "Promo spesial minggu ini — booking online sekarang!", link: "/book", link_label: "Booking" },
   hero: {
@@ -53,7 +68,7 @@ export const DEFAULT_SITE: SiteConfig = {
     cta1: "Booking Sekarang", cta2: "Lihat Layanan",
     media_type: "strips", media_layout: "frame", media_url: "", poster_url: "", overlay: 55, strip_photos: Array(9).fill(""),
   },
-  stats: { items: [] },
+  stats: { live: false, items: [] },
   marquee: { enabled: true, words: ["Self Photo", "Photobox", "Photobooth Event", "Wisuda", "Couple", "Keluarga", "Ulang Tahun", "Profile Pic", "Sahabat", "Maternity", "Prewedding", "Content Creator"] },
   reels: { ...H("Sedang Ramai", "Intip suasananya", "Video singkat dari sesi foto di studio kami."), items: [] },
   layanan: H("Layanan", "Pilih gaya fotomu"),
@@ -99,7 +114,13 @@ export function sanitizeSite(input: unknown): SiteConfig {
   const seen = new Set<SectionKey>();
   const finalOrder = [...order, ...D.order].filter((k) => (seen.has(k) ? false : (seen.add(k), true)));
 
+  const st = o("style");
   return {
+    style: {
+      mode: pick(st.mode, ["gradient", "solid"] as const, "gradient"),
+      bg: color(st.bg, D.style.bg), panel: color(st.panel, D.style.panel), fg: color(st.fg, D.style.fg),
+      display_font: pick(st.display_font, FONT_OPTIONS.map((f) => f[0]), D.style.display_font),
+    },
     brand: {
       logo_url: url(b.logo_url), logo_dark_url: url(b.logo_dark_url), favicon_url: url(b.favicon_url),
       logo_height: num(b.logo_height, 18, 72, D.brand.logo_height), show_name: bool(b.show_name, D.brand.show_name),
@@ -114,12 +135,12 @@ export function sanitizeSite(input: unknown): SiteConfig {
       media_url: url(h.media_url), poster_url: url(h.poster_url), overlay: num(h.overlay, 0, 90, D.hero.overlay),
       strip_photos: Array.from({ length: 9 }, (_, i) => url((Array.isArray(h.strip_photos) ? h.strip_photos : [])[i])),
     },
-    stats: { items: list(o("stats").items, 4, (x) => (str(x.value, 20) ? { value: str(x.value, 20), label: str(x.label, 40) } : null)) },
+    stats: { live: bool(o("stats").live, false), items: list(o("stats").items, 4, (x) => (str(x.value, 20) ? { value: str(x.value, 20), label: str(x.label, 40) } : null)) },
     marquee: { enabled: bool(mq.enabled, true), words: (Array.isArray(mq.words) ? mq.words : D.marquee.words).map((w) => str(w, 40)).filter(Boolean).slice(0, 30) },
     reels: { ...heading(r.reels, D.reels), items: list(o("reels").items, 12, (x) => (url(x.url) ? { title: str(x.title, 80), url: url(x.url), poster_url: url(x.poster_url), link: url(x.link) } : null)) },
     layanan: heading(r.layanan, D.layanan),
     background: heading(r.background, D.background),
-    gallery: { ...heading(r.gallery, D.gallery), items: list(o("gallery").items, 24, (x) => (url(x.url) ? { url: url(x.url), caption: str(x.caption, 100) } : null)) },
+    gallery: { ...heading(r.gallery, D.gallery), items: list(o("gallery").items, GALLERY_MAX, (x) => (url(x.url) ? { url: url(x.url), caption: str(x.caption, 100), package_id: Math.round(num(x.package_id, 0, 1e9, 0)) } : null)) },
     cara: heading(r.cara, D.cara),
     testimoni: {
       ...heading(r.testimoni, D.testimoni),

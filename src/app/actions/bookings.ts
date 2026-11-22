@@ -9,7 +9,7 @@ import { checkConflict, genCode } from "@/lib/bookingUtils";
 import { getOpenShift } from "@/lib/shift";
 import { buildQuote } from "@/lib/pricingServer";
 import type { DiscountLine } from "@/lib/pricing";
-import { parseOptions, roomAllowed, unitsFor } from "@/lib/packageUtils";
+import { itemName, itemUnitPrice, parseOptions, roomAllowed, unitsFor } from "@/lib/packageUtils";
 import type { ActionState } from "@/components/ActionForm";
 
 const STATUSES = ["pending", "confirmed", "done", "cancelled", "no_show"];
@@ -45,10 +45,11 @@ async function buildItems(q: Q, fd: FormData, roomId: number | null, ctx: { cust
   let pkgName = "";
   let option = "";
   if (pkgId) {
-    const [p] = await q<{ id: number; name: string; price: number; category: string; duration_min: number; per_person: boolean; max_people: number; option_label: string; options: string }>(
-      "select id, name, price, category, duration_min, per_person, max_people, option_label, options from packages where id = $1", [pkgId]);
+    const [p] = await q<{ id: number; name: string; price: number; category: string; duration_min: number; per_person: boolean; max_people: number; option_label: string; options: string; min_people: number; included_people: number; extra_person_price: number }>(
+      "select id, name, price, category, duration_min, per_person, max_people, option_label, options, min_people, included_people, extra_person_price from packages where id = $1", [pkgId]);
     if (!p) throw new Error("Paket tidak ditemukan.");
     if (people > p.max_people) throw new Error(`Paket ${p.name} maksimal ${p.max_people} orang.`);
+    if (people < p.min_people) throw new Error(`Paket ${p.name} minimal ${p.min_people} orang.`);
     const allowed = (await q<{ room_id: number }>("select room_id from package_rooms where package_id = $1", [pkgId])).map((r) => r.room_id);
     if (!roomAllowed({ room_ids: allowed }, roomId)) throw new Error(`Paket ${p.name} hanya bisa dipakai di ruang tertentu. Pilih ruang yang sesuai.`);
     const opts = parseOptions(p.options);
@@ -58,7 +59,7 @@ async function buildItems(q: Q, fd: FormData, roomId: number | null, ctx: { cust
     }
     duration = p.duration_min;
     pkgName = p.name;
-    items.push({ kind: "package", ref_id: p.id, name: p.name, qty: unitsFor(p, people), unit_price: p.price, category: p.category });
+    items.push({ kind: "package", ref_id: p.id, name: itemName(p.name, p, people), qty: unitsFor(p, people), unit_price: itemUnitPrice(p, people), category: p.category });
   }
   for (const [k, v] of fd.entries()) {
     const m = /^addon_(\d+)$/.exec(k);

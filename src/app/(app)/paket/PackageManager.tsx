@@ -6,16 +6,18 @@ import Sheet from "@/components/Sheet";
 import PackageSlides from "@/components/PackageSlides";
 import { toast } from "@/components/Toaster";
 import { CATEGORY_LABEL, rupiah } from "@/lib/format";
-import { packageImages, priceSuffix } from "@/lib/packageUtils";
+import { packageImages, peopleRange, priceSuffix } from "@/lib/packageUtils";
 import { duplicatePackage, togglePackage } from "@/app/actions/catalog";
 
 export type PkgItem = {
   id: number; name: string; category: string; price: number; per_person: boolean; duration_min: number; max_people: number;
   active: boolean; bookable_online: boolean; image_url: string; images: string[]; image_fit: string; image_x: number; image_y: number;
   includes: string; room_count: number; option_label: string;
+  min_people: number; included_people: number; extra_person_price: number; is_group: boolean; badge: string;
+  is_event: boolean; base_hours: number; extra_hour_price: number; max_hours: number; outputs: string;
 };
 
-type Status = "all" | "aktif" | "nonaktif" | "walkin" | "nofoto";
+type Status = "all" | "aktif" | "nonaktif" | "walkin" | "nofoto" | "grup" | "event";
 
 function Switch({ on, busy, label, onClick }: { on: boolean; busy: boolean; label: string; onClick: () => void }) {
   return (
@@ -48,6 +50,8 @@ export default function PackageManager({ items, editors, createEditor }: { items
     nonaktif: items.filter((p) => !val(p, "active")).length,
     walkin: items.filter((p) => !val(p, "bookable_online")).length,
     nofoto: items.filter((p) => packageImages(p).length === 0).length,
+    grup: items.filter((p) => p.is_group).length,
+    event: items.filter((p) => p.is_event).length,
   }), [items, local]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cats = useMemo(() => [...new Set(items.map((p) => p.category))], [items]);
@@ -57,6 +61,8 @@ export default function PackageManager({ items, editors, createEditor }: { items
     if (status === "nonaktif" && val(p, "active")) return false;
     if (status === "walkin" && val(p, "bookable_online")) return false;
     if (status === "nofoto" && packageImages(p).length > 0) return false;
+    if (status === "grup" && !p.is_group) return false;
+    if (status === "event" && !p.is_event) return false;
     const t = q.trim().toLowerCase();
     return !t || p.name.toLowerCase().includes(t) || p.includes.toLowerCase().includes(t);
   });
@@ -82,6 +88,7 @@ export default function PackageManager({ items, editors, createEditor }: { items
   const chips: { k: Status; l: string; n: number }[] = [
     { k: "all", l: "Semua", n: stats.total }, { k: "aktif", l: "Aktif", n: stats.aktif }, { k: "nonaktif", l: "Nonaktif", n: stats.nonaktif },
     { k: "walkin", l: "Walk-in saja", n: stats.walkin }, { k: "nofoto", l: "Tanpa foto", n: stats.nofoto },
+    { k: "grup", l: "Paket grup", n: stats.grup }, { k: "event", l: "Sewa event", n: stats.event },
   ];
 
   return (
@@ -138,10 +145,14 @@ export default function PackageManager({ items, editors, createEditor }: { items
                   <button className="block w-full p-4 text-left">
                     <p className="font-display text-lg font-semibold leading-tight">{p.name}</p>
                     <p className="font-display tnum mt-1 text-xl font-bold text-accent">{rupiah(p.price)} <span className="text-sm font-semibold text-muted">{priceSuffix(p)}</span></p>
-                    <p className="mt-1 text-xs text-muted">{p.duration_min} menit · maks {p.max_people} orang{p.room_count ? ` · ${p.room_count} ruang` : " · semua ruang"}{p.option_label ? ` · pilihan: ${p.option_label}` : ""}</p>
+                    <p className="mt-1 text-xs text-muted">{p.is_event ? `Sewa ${p.base_hours} jam` : `${p.duration_min} menit · ${peopleRange(p)}`}{p.room_count ? ` · ${p.room_count} ruang` : " · semua ruang"}{p.option_label ? ` · pilihan: ${p.option_label}` : ""}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <span className={`badge ${on ? "badge-green" : "badge-slate"}`}>{on ? "Aktif" : "Nonaktif"}</span>
                       <span className={`badge ${online ? "badge-indigo" : "badge-amber"}`}>{online ? "Bisa dipesan online" : "Walk-in saja"}</span>
+                      {p.is_event && <span className="badge badge-indigo">Sewa event{p.extra_hour_price > 0 ? ` · +${rupiah(p.extra_hour_price)}/jam` : ""}</span>}
+                      {p.is_group && <span className="badge badge-indigo">Paket grup</span>}
+                      {p.badge && <span className="badge badge-amber">{p.badge}</span>}
+                      {!p.per_person && p.included_people > 0 && p.extra_person_price > 0 && <span className="badge badge-slate">+{rupiah(p.extra_person_price)}/orang &gt;{p.included_people}</span>}
                     </div>
                   </button>}>
                   {editors[p.id]}
@@ -167,7 +178,7 @@ export default function PackageManager({ items, editors, createEditor }: { items
                 <Sheet title="Edit Paket" wide className="block min-w-0 flex-1 basis-48" trigger={
                   <button className="block w-full min-w-0 text-left">
                     <p className="truncate font-semibold">{p.name}</p>
-                    <p className="truncate text-xs text-muted">{CATEGORY_LABEL[p.category] ?? p.category} · {p.duration_min} mnt · maks {p.max_people} · {urls.length} foto</p>
+                    <p className="truncate text-xs text-muted">{CATEGORY_LABEL[p.category] ?? p.category} · {p.is_event ? `Sewa ${p.base_hours} jam` : `${p.duration_min} mnt · ${peopleRange(p)}`}{p.is_group ? " · grup" : ""} · {urls.length} foto</p>
                   </button>}>
                   {editors[p.id]}
                 </Sheet>

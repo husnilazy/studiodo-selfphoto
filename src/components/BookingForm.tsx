@@ -8,9 +8,9 @@ import { createBooking, updateBooking } from "@/app/actions/bookings";
 import { quoteAdmin } from "@/app/actions/quote";
 import type { QuoteResult } from "@/lib/pricingServer";
 import { CATEGORY_LABEL, METHOD_LABEL, SOURCE_LABEL, addMin, rupiah } from "@/lib/format";
-import { packageTotal, parseOptions, priceSuffix, roomAllowed, unitsFor } from "@/lib/packageUtils";
+import { itemName, packageTotal, parseOptions, peopleRange, priceSuffix, roomAllowed, unitsFor } from "@/lib/packageUtils";
 
-type Pkg = { id: number; name: string; category: string; price: number; duration_min: number; max_people: number; per_person: boolean; option_label: string; options: string; room_ids: number[] };
+type Pkg = { id: number; name: string; category: string; price: number; duration_min: number; max_people: number; per_person: boolean; option_label: string; options: string; room_ids: number[]; min_people: number; included_people: number; extra_person_price: number; is_group: boolean };
 type Room = { id: number; name: string; color: string };
 type Addon = { id: number; name: string; price: number };
 export type BookingInit = {
@@ -116,14 +116,14 @@ export default function BookingForm({
                 {g.items.map((p) => (
                   <label key={p.id} className="cursor-pointer">
                     <input type="radio" name="package_id" value={p.id} checked={pkgId === p.id} onChange={() => {
-                      setPkgId(p.id); setPeople((c) => Math.min(c, p.max_people)); setOption("");
+                      setPkgId(p.id); setPeople((c) => Math.min(p.max_people, Math.max(c, p.min_people))); setOption("");
                       const ok = p.room_ids.length ? rooms.filter((r) => p.room_ids.includes(r.id)) : rooms;
                       setRoomId((cur) => (cur !== "" && ok.some((r) => r.id === cur) ? cur : (ok[0]?.id ?? "")));
                     }} className="peer sr-only" />
                     <span className="flex h-full flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-line bg-panel p-3 transition peer-checked:border-accent peer-checked:bg-accentsoft peer-focus-visible:ring-2 peer-focus-visible:ring-accent">
                       <span className="min-w-0">
                         <span className="block font-semibold leading-tight">{p.name}</span>
-                        <span className="block text-xs text-muted">{p.duration_min} menit · maks {p.max_people} orang</span>
+                        <span className="block text-xs text-muted">{p.duration_min} menit · {peopleRange(p)}{p.is_group ? " · grup" : ""}{!p.per_person && p.included_people > 0 && p.extra_person_price > 0 ? ` · +${rupiah(p.extra_person_price)}/orang >${p.included_people}` : ""}</span>
                       </span>
                       <span className="tnum shrink-0 font-bold text-accent">{rupiah(p.price)}<span className="text-xs font-semibold text-muted"> {priceSuffix(p)}</span></span>
                     </span>
@@ -141,7 +141,7 @@ export default function BookingForm({
             </label>
             <label className="block"><span className="label">Jumlah orang</span>
               <div className="flex items-center gap-2">
-                <Step onClick={() => setPeople((p) => Math.max(1, p - 1))}>−</Step>
+                <Step onClick={() => setPeople((p) => Math.max(pkg?.min_people ?? 1, p - 1))}>−</Step>
                 <input name="people" readOnly value={people} className="input tnum text-center font-semibold" />
                 <Step onClick={() => setPeople((p) => Math.min(pkg?.max_people ?? 99, p + 1))}>+</Step>
               </div>
@@ -270,7 +270,7 @@ export default function BookingForm({
         <div className="card p-4">
           <p className="font-display mb-3 font-semibold">Ringkasan</p>
           <dl className="space-y-1.5 text-sm">
-            <Row k={pkg ? (pkg.per_person ? `${pkg.name} × ${unitsFor(pkg, people)} orang` : pkg.name) : "Paket"} v={rupiah(pkg ? packageTotal(pkg, people) : 0)} />
+            <Row k={pkg ? (pkg.per_person ? `${pkg.name} × ${unitsFor(pkg, people)} orang` : itemName(pkg.name, pkg, people)) : "Paket"} v={rupiah(pkg ? packageTotal(pkg, people) : 0)} />
             {addons.filter((a) => (qty[a.id] ?? 0) > 0).map((a) => <Row key={a.id} k={`${a.name} ×${qty[a.id]}`} v={rupiah(a.price * qty[a.id])} />)}
             {customPrice > 0 && <Row k="Item tambahan" v={rupiah(customPrice)} />}
             {q ? q.lines.map((l, i) => <Row key={i} k={l.label} v={`− ${rupiah(l.amount)}`} tone="text-ok" />)

@@ -9,10 +9,11 @@ import type { QuoteResult } from "@/lib/pricingServer";
 import type { Deal, GroupDeal } from "@/lib/pricing";
 import { CATEGORY_LABEL, addDays, addMin, fmtDate, rupiah } from "@/lib/format";
 import { roomGradient } from "@/lib/siteUtils";
-import { packageTotal, parseOptions, priceSuffix, roomAllowed, unitsFor } from "@/lib/packageUtils";
+import PackageSlides from "../PackageSlides";
+import { extraPeople, itemName, packageImages, packageTotal, parseOptions, peopleRange, priceSuffix, roomAllowed, unitsFor } from "@/lib/packageUtils";
 
-type Pkg = { id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; image_url: string; per_person: boolean; option_label: string; options: string; room_ids: number[]; deal?: Deal | null; group?: GroupDeal | null };
-type Room = { id: number; name: string; color: string; description: string; image_url: string };
+type Pkg = { id: number; name: string; category: string; description: string; includes: string; price: number; duration_min: number; max_people: number; image_url: string; per_person: boolean; option_label: string; options: string; room_ids: number[]; min_people: number; included_people: number; extra_person_price: number; is_group: boolean; badge: string; deal?: Deal | null; group?: GroupDeal | null };
+type Room = { id: number; name: string; color: string; description: string; image_url: string; images?: string[] };
 type Addon = { id: number; name: string; price: number };
 type Slot = { t: string; rooms: number[] };
 
@@ -33,7 +34,7 @@ export default function BookingWizard({
   const [date, setDate] = useState(today);
   const [time, setTime] = useState("");
   const [slots, setSlots] = useState<Slot[] | null>(null);
-  const [people, setPeople] = useState(1);
+  const [people, setPeople] = useState(() => Math.max(1, packages.find((p) => p.id === initialPackage)?.min_people ?? 1));
   const [option, setOption] = useState("");
   const [qty, setQty] = useState<Record<number, number>>({});
   const [name, setName] = useState("");
@@ -136,6 +137,7 @@ export default function BookingWizard({
         {step === 0 && (
           <section>
             <Heading t="Pilih layanan" d="Pilih paket yang sesuai kebutuhanmu." />
+            <p className="-mt-3 mb-6 text-sm text-muted">Sudah pernah booking? <Link href="/book/status" className="font-semibold text-accent underline-offset-2 hover:underline">Cek status booking kamu</Link>.</p>
             {grouped.map((g) => (
               <div key={g.k} className="mb-7">
                 <p className="mb-3 text-xs font-bold uppercase tracking-[.18em] text-accent">{g.label}</p>
@@ -144,14 +146,15 @@ export default function BookingWizard({
                     const on = p.id === pkgId;
                     return (
                       <button key={p.id} type="button" onClick={() => {
-                        setPkgId(p.id); setPeople((c) => Math.min(c, p.max_people)); setOption("");
+                        setPkgId(p.id); setPeople((c) => Math.min(p.max_people, Math.max(c, p.min_people))); setOption("");
                         setRoomId((cur) => (cur === null || roomAllowed(p, cur) ? cur : null));
                       }}
                         className={`glass lift relative overflow-hidden rounded-2xl p-5 text-left ${on ? "!border-accent ring-2 ring-accent/40" : ""}`}>
                         {on && <span className="pop-in absolute right-3 top-3 grid size-6 place-items-center rounded-full bg-accent text-accentfg"><Icon name="check" className="size-4" /></span>}
                         <p className="font-display pr-8 text-lg font-semibold leading-tight">{p.name}</p>
-                        <p className="mt-1 text-sm text-muted">{p.duration_min} menit · hingga {p.max_people} orang</p>
-                        {(p.description || p.includes) && <p className="mt-2 line-clamp-2 text-sm text-muted">{p.description || p.includes}</p>}
+                        <p className="mt-1 text-sm text-muted">{p.duration_min} menit · {p.min_people > 1 ? peopleRange(p) : `hingga ${p.max_people} orang`}{p.is_group ? " · Paket grup" : ""}</p>
+                        {p.description && <p className="mt-2 line-clamp-2 text-sm text-muted">{p.description}</p>}
+                        <Includes text={p.includes} max={3} className="mt-2" />
                         <p className="font-display mt-3 text-xl font-bold text-accent">
                           {p.deal && <span className="mr-2 text-sm font-semibold text-muted line-through">{rupiah(p.price)}</span>}
                           {rupiah(p.deal ? p.deal.salePrice : p.price)} <span className="text-sm font-semibold text-muted">{priceSuffix(p)}</span>
@@ -169,16 +172,26 @@ export default function BookingWizard({
         {step === 1 && pkg && (
           <section>
             <Heading t="Background & jadwal" d={`${pkg.name} · ${pkg.duration_min} menit`} />
+            {(pkg.description || pkg.includes.trim()) && (
+              <div className="glass mb-8 rounded-2xl p-4 sm:p-5">
+                <p className="mb-2 text-xs font-bold uppercase tracking-[.18em] text-accent">Yang kamu dapat</p>
+                {pkg.description && <p className="mb-2 text-sm text-muted">{pkg.description}</p>}
+                <Includes text={pkg.includes} />
+              </div>
+            )}
             <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
                 <p className="mb-3 text-sm font-bold">Jumlah orang{pkg.per_person && <span className="font-normal text-muted"> · {rupiah(pkg.price)} / orang</span>}</p>
                 <div className="flex items-center gap-3">
-                  <Stepper onClick={() => setPeople((p) => Math.max(1, p - 1))}>−</Stepper>
+                  <Stepper onClick={() => setPeople((p) => Math.max(pkg.min_people, p - 1))}>−</Stepper>
                   <span className="font-display w-10 text-center text-2xl font-semibold">{people}</span>
                   <Stepper onClick={() => setPeople((p) => Math.min(pkg.max_people, p + 1))}>+</Stepper>
-                  <span className="text-sm text-muted">maks {pkg.max_people}</span>
+                  <span className="text-sm text-muted">{pkg.min_people > 1 ? `${pkg.min_people}–${pkg.max_people} orang` : `maks ${pkg.max_people}`}</span>
                 </div>
-                {pkg.per_person && <p className="mt-2 text-sm font-semibold text-accent">Subtotal {rupiah(q ? q.packageAmount - q.discount : packageTotal(pkg, people))}{q && q.discount > 0 && <span className="ml-2 text-xs font-semibold text-ok">hemat {rupiah(q.discount)}</span>}</p>}
+                {(pkg.per_person || pkg.included_people > 0) && <p className="mt-2 text-sm font-semibold text-accent">Subtotal {rupiah(q ? q.packageAmount - q.discount : packageTotal(pkg, people))}{q && q.discount > 0 && <span className="ml-2 text-xs font-semibold text-ok">hemat {rupiah(q.discount)}</span>}</p>}
+                {!pkg.per_person && pkg.included_people > 0 && pkg.extra_person_price > 0 && (
+                  <p className="mt-1 text-xs text-muted">Harga sudah termasuk {pkg.included_people} orang. Orang tambahan +{rupiah(pkg.extra_person_price)} / orang{extraPeople(pkg, people) > 0 ? ` (${extraPeople(pkg, people)} orang tambahan)` : ""}.</p>
+                )}
                 {pkg.group && people < pkg.group.minPeople && (
                   <button type="button" onClick={() => setPeople(Math.min(pkg.max_people, pkg.group!.minPeople))} className="pop-in mt-3 rounded-xl bg-accentsoft px-3 py-2 text-left text-xs font-semibold text-accent transition hover:brightness-105">
                     👥 {pkg.group.text}: {rupiah(pkg.group.unitPrice)}{pkg.per_person ? " / orang" : ""} — ketuk untuk pilih {pkg.group.minPeople} orang
@@ -201,7 +214,7 @@ export default function BookingWizard({
                 <p className="mb-3 text-sm font-bold">Background / tema</p>
                 <div className="hscroll -mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
                   <RoomCard on={roomId === null} onClick={() => setRoomId(null)} name="Bebas" sub="Kami pilihkan yang kosong" bg="linear-gradient(135deg, var(--accent), var(--accent-2))" />
-                  {rooms.filter((r) => roomAllowed(pkg, r.id)).map((r) => <RoomCard key={r.id} on={roomId === r.id} onClick={() => setRoomId(r.id)} name={r.name} sub={r.description} bg={roomGradient(r.color)} img={r.image_url} />)}
+                  {rooms.filter((r) => roomAllowed(pkg, r.id)).map((r) => <RoomCard key={r.id} on={roomId === r.id} onClick={() => setRoomId(r.id)} name={r.name} sub={r.description} bg={roomGradient(r.color)} imgs={packageImages(r)} />)}
                 </div>
               </div>
             )}
@@ -288,7 +301,7 @@ export default function BookingWizard({
             <Heading t="Periksa & kirim" d="Pastikan semuanya sudah benar." />
             <div className="glass rounded-3xl p-5 sm:p-7">
               <dl className="space-y-3 text-sm">
-                <Row k="Layanan" v={pkg.per_person ? `${pkg.name} × ${unitsFor(pkg, people)} orang` : pkg.name} />
+                <Row k="Layanan" v={pkg.per_person ? `${pkg.name} × ${unitsFor(pkg, people)} orang` : itemName(pkg.name, pkg, people)} />
                 {option && <Row k={pkg.option_label || "Pilihan"} v={option} />}
                 <Row k="Background" v={roomName ?? "—"} />
                 <Row k="Tanggal" v={fmtDate(date, { weekday: true })} />
@@ -338,6 +351,18 @@ export default function BookingWizard({
   );
 }
 
+/** Isi paket (satu baris = satu poin) sebagai daftar centang. `max` memotong dan menambah "+n lainnya". */
+function Includes({ text, max, className = "" }: { text: string; max?: number; className?: string }) {
+  const lines = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  if (!lines.length) return null;
+  const shown = max ? lines.slice(0, max) : lines;
+  return (
+    <ul className={`space-y-1 text-sm ${className}`}>
+      {shown.map((l, i) => <li key={i} className="flex gap-2"><Icon name="check" className="mt-0.5 size-4 shrink-0 text-accent" /><span>{l}</span></li>)}
+      {shown.length < lines.length && <li className="pl-6 text-xs font-semibold text-muted">+{lines.length - shown.length} lainnya</li>}
+    </ul>
+  );
+}
 function Heading({ t, d }: { t: string; d: string }) {
   return <div className="mb-6"><h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">{t}</h1><p className="mt-1 text-muted">{d}</p></div>;
 }
@@ -347,12 +372,11 @@ function Stepper({ children, onClick }: { children: React.ReactNode; onClick: ()
 function Row({ k, v }: { k: string; v: string }) {
   return <div className="flex justify-between gap-4"><dt className="text-muted">{k}</dt><dd className="text-right font-semibold">{v}</dd></div>;
 }
-function RoomCard({ on, onClick, name, sub, bg, img }: { on: boolean; onClick: () => void; name: string; sub?: string; bg: string; img?: string }) {
+function RoomCard({ on, onClick, name, sub, bg, imgs = [] }: { on: boolean; onClick: () => void; name: string; sub?: string; bg: string; imgs?: string[] }) {
   return (
     <button type="button" onClick={onClick} className={`lift group relative h-36 w-40 shrink-0 overflow-hidden rounded-2xl text-left sm:w-44 ${on ? "ring-2 ring-accent ring-offset-2 ring-offset-bg" : ""}`}>
-      {img ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={img} alt="" className="absolute inset-0 size-full object-cover transition-transform duration-700 group-hover:scale-110" />
+      {imgs.length > 0 ? (
+        <div className="absolute inset-0"><PackageSlides urls={imgs} name={name} controls={false} /></div>
       ) : <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-110" style={{ background: bg }} />}
       <div className="absolute inset-0 bg-gradient-to-t from-black/65 to-transparent" />
       {on && <span className="pop-in absolute right-2 top-2 grid size-6 place-items-center rounded-full bg-white text-accent"><Icon name="check" className="size-4" /></span>}

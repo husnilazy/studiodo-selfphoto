@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { prepareMediaUpload, saveSite } from "@/app/actions/website";
 import { uploadToStorage } from "@/lib/uploadClient";
-import { FONT_FAMILY, FONT_OPTIONS, SECTION_LABEL, imageSrc, mediaKind, type Heading, type SectionKey, type SiteConfig } from "@/lib/siteConfig";
+import { FONT_FAMILY, FONT_OPTIONS, GALLERY_MAX, SECTION_LABEL, SOLID_PRESETS, imageSrc, mediaKind, type Heading, type SectionKey, type SiteConfig } from "@/lib/siteConfig";
 
 type Upd = (fn: (d: SiteConfig) => void) => void;
 const TABS = [
@@ -17,7 +17,9 @@ const PRESETS: [string, string, string][] = [
   ["Indigo", "#4f4fe8", "#a78bfa"], ["Rose", "#e11d6a", "#fb923c"], ["Emerald", "#059669", "#2dd4bf"], ["Sky", "#0284c7", "#818cf8"], ["Amber", "#d97706", "#f472b6"], ["Mono", "#18181b", "#71717a"],
 ];
 
-export default function SiteEditor({ initial, storage }: { initial: SiteConfig; storage: boolean }) {
+type PackageOpt = { id: number; name: string };
+
+export default function SiteEditor({ initial, storage, packages }: { initial: SiteConfig; storage: boolean; packages: PackageOpt[] }) {
   const [cfg, setCfg] = useState<SiteConfig>(initial);
   const [saved, setSaved] = useState(JSON.stringify(initial));
   const [tab, setTab] = useState<Tab>("brand");
@@ -58,7 +60,7 @@ export default function SiteEditor({ initial, storage }: { initial: SiteConfig; 
         {tab === "hero" && <Hero cfg={cfg} upd={upd} storage={storage} />}
         {tab === "stats" && <Stats cfg={cfg} upd={upd} />}
         {tab === "reels" && <Reels cfg={cfg} upd={upd} storage={storage} />}
-        {tab === "gallery" && <Gallery cfg={cfg} upd={upd} storage={storage} />}
+        {tab === "gallery" && <Gallery cfg={cfg} upd={upd} storage={storage} packages={packages} />}
         {tab === "testi" && <Testi cfg={cfg} upd={upd} storage={storage} />}
         {tab === "sections" && <Sections cfg={cfg} upd={upd} />}
         {tab === "lokasi" && <Lokasi cfg={cfg} upd={upd} storage={storage} />}
@@ -257,9 +259,43 @@ const move = <T,>(a: T[], i: number, d: -1 | 1) => { const j = i + d; if (j < 0 
 
 /* ───────── Tab ───────── */
 function Brand({ cfg, upd, storage }: { cfg: SiteConfig; upd: Upd; storage: boolean }) {
-  const b = cfg.brand, a = cfg.announce;
+  const b = cfg.brand, a = cfg.announce, st = cfg.style;
   return (
     <>
+      <Card title="Gaya tampilan website" hint="Gradient = tampilan bawaan (aurora, kaca, glow). Solid = datar tanpa gradien: warna latar, kartu, dan teks diatur sendiri, dan menu atas berbentuk pil berwarna.">
+        <div className="flex flex-wrap gap-2">
+          {(["gradient", "solid"] as const).map((m) => (
+            <button key={m} type="button" className="chip" data-on={st.mode === m} onClick={() => upd((d) => { d.style.mode = m; })}>{m === "solid" ? "Solid (datar)" : "Gradient (bawaan)"}</button>
+          ))}
+        </div>
+        {st.mode === "solid" && (
+          <>
+            <div>
+              <span className="label">Palet siap pakai</span>
+              <div className="flex flex-wrap gap-2">
+                {SOLID_PRESETS.map(([n, bg, panel, fg, ac]) => (
+                  <button key={n} type="button" className="chip gap-2" data-on={st.bg === bg && st.fg === fg && b.accent === ac}
+                    onClick={() => upd((d) => { d.style.bg = bg; d.style.panel = panel; d.style.fg = fg; d.brand.accent = ac; })}>
+                    <span className="flex overflow-hidden rounded-full ring-1 ring-line">{[bg, ac, fg].map((c) => <span key={c} className="size-4" style={{ background: c }} />)}</span>{n}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Grid>
+              <label className="block"><span className="label">Warna latar</span><input type="color" className="input !p-1" value={st.bg} onChange={(e) => upd((d) => { d.style.bg = e.target.value; })} /></label>
+              <label className="block"><span className="label">Warna kartu</span><input type="color" className="input !p-1" value={st.panel} onChange={(e) => upd((d) => { d.style.panel = e.target.value; })} /></label>
+              <label className="block"><span className="label">Warna teks</span><input type="color" className="input !p-1" value={st.fg} onChange={(e) => upd((d) => { d.style.fg = e.target.value; })} /></label>
+              <label className="block"><span className="label">Warna utama (tombol & menu)</span><input type="color" className="input !p-1" value={b.accent} onChange={(e) => upd((d) => { d.brand.accent = e.target.value; })} /></label>
+            </Grid>
+            <label className="block"><span className="label">Font judul</span>
+              <select className="input" value={st.display_font} onChange={(e) => upd((d) => { d.style.display_font = e.target.value as typeof st.display_font; })}>
+                {FONT_OPTIONS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+            </label>
+            <p className="text-xs text-muted">Pada gaya Solid, warna kedua (gradien) tidak dipakai, dan tampilan tidak mengikuti mode gelap/terang perangkat.</p>
+          </>
+        )}
+      </Card>
       <Card title="Logo" hint="PNG/SVG transparan terbaik. Logo ini tampil di navigasi dan footer.">
         <Grid>
           <MediaField label="Logo (mode terang)" value={b.logo_url} onChange={(v) => upd((d) => { d.brand.logo_url = v; })} storage={storage} />
@@ -368,6 +404,8 @@ function Stats({ cfg, upd }: { cfg: SiteConfig; upd: Upd }) {
   return (
     <>
       <Card title="Angka statistik" hint="Ditampilkan di bawah teks banner dengan animasi hitung naik. Kosongkan semua untuk memakai angka otomatis (jumlah background, harga mulai, jam buka).">
+        <Toggle label="Tampilkan angka nyata dari kasir (sesi foto selesai & orang berfoto)" value={cfg.stats.live} onChange={(v) => upd((d) => { d.stats.live = v; })} />
+        <p className="text-xs text-muted">Dihitung otomatis dari booking berstatus Selesai dan dibulatkan ke bawah (mis. 1.200+). Baru tampil setelah ada minimal 10 sesi selesai, dan hanya dipakai bila angka manual di bawah kosong.</p>
         <Repeater items={cfg.stats.items} max={4} addLabel="Tambah angka" empty="Memakai angka otomatis."
           onAdd={() => upd((d) => { d.stats.items.push({ value: "", label: "" }); })} onRemove={(i) => upd((d) => { d.stats.items.splice(i, 1); })} onMove={(i, dir) => upd((d) => move(d.stats.items, i, dir))}
           render={(it, i) => (
@@ -403,9 +441,21 @@ function Reels({ cfg, upd, storage }: { cfg: SiteConfig; upd: Upd; storage: bool
   );
 }
 
-function Gallery({ cfg, upd, storage }: { cfg: SiteConfig; upd: Upd; storage: boolean }) {
+function PackageSelect({ value, onChange, packages, label }: { value: number; onChange: (v: number) => void; packages: PackageOpt[]; label: string }) {
+  return (
+    <label className="block"><span className="label">{label}</span>
+      <select className="input" value={value} onChange={(e) => onChange(Number(e.target.value))}>
+        <option value={0}>Umum (tanpa paket)</option>
+        {packages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function Gallery({ cfg, upd, storage, packages }: { cfg: SiteConfig; upd: Upd; storage: boolean; packages: PackageOpt[] }) {
   const bulk = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string>("");
+  const [target, setTarget] = useState(0); // paket tujuan untuk foto yang diunggah massal
   async function addMany(files: File[]) {
     for (let n = 0; n < files.length; n++) {
       const f = files[n];
@@ -414,24 +464,26 @@ function Gallery({ cfg, upd, storage }: { cfg: SiteConfig; upd: Upd; storage: bo
       if (!p.ok) { setBusy(p.error); return; }
       const ok = await fetch(p.uploadUrl, { method: "PUT", headers: { "Content-Type": p.contentType, "Cache-Control": p.cacheControl }, body: f }).then((r) => r.ok).catch(() => false);
       if (!ok) { setBusy("Upload gagal."); return; }
-      upd((d) => { if (d.gallery.items.length < 24) d.gallery.items.push({ url: p.publicUrl, caption: "" }); });
+      upd((d) => { if (d.gallery.items.length < GALLERY_MAX) d.gallery.items.push({ url: p.publicUrl, caption: "", package_id: target }); });
     }
     setBusy("");
   }
   return (
-    <Card title="Galeri foto" hint="Tampil sebagai grid masonry dengan lightbox. Maksimal 24 foto.">
+    <Card title="Galeri foto" hint={`Pilih paket untuk tiap foto: di halaman Hasil Foto, foto dikelompokkan per paket dengan tombol booking-nya. Foto tanpa paket masuk grup "Umum". Maksimal ${GALLERY_MAX} foto.`}>
       {storage && (
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-48"><PackageSelect label="Foto yang diunggah masuk ke" value={target} onChange={setTarget} packages={packages} /></div>
           <input ref={bulk} type="file" multiple accept="image/*" className="hidden" onChange={(e) => { const f = [...(e.target.files ?? [])]; e.target.value = ""; if (f.length) void addMany(f); }} />
           <button type="button" className="btn btn-primary btn-sm" disabled={!!busy && !busy.includes("gagal")} onClick={() => bulk.current?.click()}>Upload banyak foto sekaligus</button>
           {busy && <span className="text-sm font-semibold text-muted">{busy}</span>}
         </div>
       )}
-      <Repeater items={cfg.gallery.items} max={24} addLabel="Tambah foto" empty="Belum ada foto — bagian ini otomatis disembunyikan sampai ada isinya."
-        onAdd={() => upd((d) => { d.gallery.items.push({ url: "", caption: "" }); })} onRemove={(i) => upd((d) => { d.gallery.items.splice(i, 1); })} onMove={(i, dir) => upd((d) => move(d.gallery.items, i, dir))}
+      <Repeater items={cfg.gallery.items} max={GALLERY_MAX} addLabel="Tambah foto" empty="Belum ada foto — bagian ini otomatis disembunyikan sampai ada isinya."
+        onAdd={() => upd((d) => { d.gallery.items.push({ url: "", caption: "", package_id: target }); })} onRemove={(i) => upd((d) => { d.gallery.items.splice(i, 1); })} onMove={(i, dir) => upd((d) => move(d.gallery.items, i, dir))}
         render={(it, i) => (
           <>
             <MediaField label="Foto" storage={storage} value={it.url} onChange={(v) => upd((d) => { d.gallery.items[i].url = v; })} />
+            <PackageSelect label="Paket / konsep" value={it.package_id} onChange={(v) => upd((d) => { d.gallery.items[i].package_id = v; })} packages={packages} />
             <Txt label="Keterangan (opsional)" value={it.caption} onChange={(v) => upd((d) => { d.gallery.items[i].caption = v; })} />
           </>
         )} />

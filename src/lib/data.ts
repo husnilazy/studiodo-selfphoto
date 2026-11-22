@@ -11,11 +11,13 @@ export async function getStudio(): Promise<Studio> {
 export type PackageRow = {
   id: number; name: string; category: string; price: number; duration_min: number; max_people: number;
   per_person: boolean; bookable_online: boolean; option_label: string; options: string; room_ids: number[];
+  min_people: number; included_people: number; extra_person_price: number; is_group: boolean;
 };
 export const PACKAGE_SELECT = `select p.id, p.name, p.category, p.price, p.duration_min, p.max_people, p.per_person, p.bookable_online, p.option_label, p.options,
+  p.min_people, p.included_people, p.extra_person_price, p.is_group,
   coalesce((select array_agg(pr.room_id order by pr.room_id) from package_rooms pr where pr.package_id = p.id), '{}') as room_ids from packages p`;
 export const activePackages = () =>
-  q<PackageRow>(`${PACKAGE_SELECT} where p.active order by case p.category when 'self_photo' then 0 when 'photobox' then 1 when 'photobooth' then 2 else 3 end, p.price`);
+  q<PackageRow>(`${PACKAGE_SELECT} where p.active order by case p.category when 'self_photo' then 0 when 'photobox' then 1 when 'photobooth' then 2 else 3 end, p.position, p.price`);
 export const activeRooms = () => q<{ id: number; name: string; color: string }>("select id, name, color from rooms where active order by sort, id");
 export const activeAddons = () => q<{ id: number; name: string; price: number }>("select id, name, price from addons where active order by sort, id");
 

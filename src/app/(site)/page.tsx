@@ -4,6 +4,9 @@ import CountUp from "@/components/site/CountUp";
 import GalleryGrid from "@/components/site/GalleryGrid";
 import PackageTabs from "@/components/site/PackageTabs";
 import ReelsRail from "@/components/site/ReelsRail";
+import StepsFlow from "@/components/site/StepsFlow";
+import PackageSlides from "@/components/PackageSlides";
+import { packageImages } from "@/lib/packageUtils";
 import Reveal from "@/components/site/Reveal";
 import { Accordion, Depth, MouseStage, Parallax, ScrollMarquee, SpotlightListener, SplitTitle, Tilt } from "@/components/site/motion";
 import { getSiteData, roomGradient } from "@/lib/siteData";
@@ -15,7 +18,8 @@ type Data = Awaited<ReturnType<typeof getSiteData>>;
 export default async function Landing() {
   const d = await getSiteData();
   const { online, site, packages, rooms } = d;
-  const show = visibleSections(site, { rooms: rooms.length, packages: packages.length });
+  // Bagian Background hanya tampil untuk ruang yang punya foto (tanpa foto hanya berupa kartu warna).
+  const show = visibleSections(site, { rooms: rooms.filter((r) => packageImages(r).length > 0).length, packages: packages.length });
   const bgHero = site.hero.media_type !== "strips" && site.hero.media_layout === "background" && !!site.hero.media_url;
 
   const SECTIONS: Record<SectionKey, () => React.ReactNode> = {
@@ -30,8 +34,22 @@ export default async function Landing() {
     cta: () => <Cta d={d} />,
   };
 
+  // Data terstruktur agar Google paham ini bisnis lokal (nama, alamat, jam buka, kisaran harga).
+  const address = site.lokasi.address || d.studio.address;
+  const firstPhoto = site.gallery.items[0]?.url;
+  const ld = {
+    "@context": "https://schema.org", "@type": "LocalBusiness", name: d.studio.name,
+    ...(address ? { address } : {}),
+    ...(online.whatsapp ? { telephone: online.whatsapp } : {}),
+    ...(firstPhoto ? { image: imageSrc(firstPhoto) } : {}),
+    ...(packages.length ? { priceRange: `Mulai ${rupiah(Math.min(...packages.map((p) => p.price)))}` } : {}),
+    openingHours: `Mo-Su ${d.studio.open}-${d.studio.close}`,
+    ...(online.instagram ? { sameAs: [`https://instagram.com/${online.instagram}`] } : {}),
+  };
+
   return (
     <main>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld).replace(/</g, "\\u003c") }} />
       <SpotlightListener />
       <Hero d={d} bgHero={bgHero} />
       {site.marquee.enabled && site.marquee.words.length > 0 && <ScrollMarquee words={site.marquee.words} />}
@@ -96,10 +114,11 @@ function Hero({ d, bgHero }: { d: Data; bgHero: boolean }) {
   const photos = h.strip_photos.some(Boolean) ? h.strip_photos : site.gallery.items.map((g) => g.url).slice(0, 9);
   const muted = bgHero ? "text-white/80" : "text-muted";
   const stats = site.stats.items.length ? site.stats.items : [
+    ...(d.live ? [{ value: d.live.sessions, label: "sesi foto selesai" }, { value: d.live.people, label: "orang berfoto" }] : []),
     { value: rooms.length ? `${rooms.length}` : "", label: "pilihan background" },
     { value: minPrice ? `${Math.round(minPrice / 1000)}rb` : "", label: "mulai dari" },
     { value: `${studio.open.replace(":00", "")}–${studio.close.replace(":00", "")}`, label: "jam buka" },
-  ].filter((s) => s.value);
+  ].filter((s) => s.value).slice(0, 4);
 
   return (
     <section className={`relative overflow-hidden px-4 pb-20 pt-32 sm:px-6 sm:pt-40 ${bgHero ? "text-white" : ""}`}>
@@ -225,7 +244,7 @@ function Services({ d }: { d: Data }) {
       <Blobs />
       <div className="mx-auto max-w-6xl">
         <SectionHead h={site.layanan} />
-        <Reveal variant="up"><PackageTabs packages={packages} bookingOpen={online.enabled} /></Reveal>
+        <Reveal variant="up"><PackageTabs packages={packages} bookingOpen={online.enabled} whatsapp={online.whatsapp} studioName={d.studio.name} /></Reveal>
         {addons.length > 0 && (
           <Reveal className="mt-10" variant="zoom">
             <div className="glass spot mx-auto max-w-3xl rounded-3xl p-6 text-center">
@@ -250,14 +269,13 @@ function Backgrounds({ d }: { d: Data }) {
       <div className="mx-auto max-w-6xl">
         <SectionHead h={site.background} />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {rooms.map((r, i) => (
+          {rooms.filter((r) => packageImages(r).length > 0).map((r, i) => (
             <Reveal key={r.id} delay={(i % 3) * 120} variant="zoom">
               <Tilt max={5}>
                 <Link href={open ? `/book?room=${r.id}` : "#lokasi"} className="lift group relative block aspect-[5/4] overflow-hidden rounded-3xl sm:aspect-[4/5]">
                   <Parallax speed={-0.07} className="absolute inset-0" innerClassName="absolute -inset-[14%]">
-                    {r.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={imageSrc(r.image_url)} alt={r.name} loading="lazy" className="size-full object-cover transition-transform duration-[900ms] group-hover:scale-110" />
+                    {packageImages(r).length > 0 ? (
+                      <PackageSlides urls={packageImages(r)} name={r.name} controls={false} />
                     ) : (
                       <div className="size-full transition-transform duration-[900ms] group-hover:scale-110" style={{ background: roomGradient(r.color) }} />
                     )}
@@ -284,7 +302,10 @@ function GallerySec({ site }: { site: SiteConfig }) {
       <Blobs />
       <div className="mx-auto max-w-6xl">
         <SectionHead h={site.gallery} />
-        <GalleryGrid items={site.gallery.items} />
+        <GalleryGrid items={site.gallery.items.slice(0, 12)} />
+        <div className="mt-10 text-center">
+          <Link href="/hasil-foto" className="btn btn-primary !rounded-full !px-7">Lihat hasil foto tiap paket <Icon name="right" className="size-4" /></Link>
+        </div>
       </div>
     </section>
   );
@@ -303,25 +324,7 @@ function Steps({ d }: { d: Data }) {
       <Blobs a="right" b="left" />
       <div className="mx-auto max-w-6xl">
         <SectionHead h={site.cara} className="mb-14" />
-        <ol className="relative grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <Reveal className="pointer-events-none absolute left-[12%] right-[12%] top-[2.25rem] z-0 hidden lg:block" variant="blur">
-            <div className="h-px w-full" style={{ background: "linear-gradient(90deg, transparent, var(--accent), transparent)" }} />
-          </Reveal>
-          {steps.map((s, i) => (
-            <Reveal as="li" key={s.t} delay={i * 130} variant={i % 2 ? "up" : "zoom"} className="relative z-10">
-              <Tilt max={7} className="h-full">
-                <div className="glass lift spot h-full rounded-3xl p-6">
-                  <div className="mb-5 flex items-center justify-between">
-                    <span className="grid size-12 place-items-center rounded-2xl bg-accent text-accentfg shadow-lg shadow-accent/30"><Icon name={s.icon} className="size-6" /></span>
-                    <span className="font-display text-5xl font-bold text-line">{i + 1}</span>
-                  </div>
-                  <h3 className="font-display text-lg font-semibold">{s.t}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted">{s.d}</p>
-                </div>
-              </Tilt>
-            </Reveal>
-          ))}
-        </ol>
+        <StepsFlow steps={steps.map((s) => ({ icon: s.icon, title: s.t, desc: s.d }))} />
         {online.enabled && <Reveal className="mt-12 text-center" variant="zoom" delay={200}><Link href="/book" className="btn btn-primary btn-hero btn-glow">Mulai Booking <Icon name="right" className="size-5" /></Link></Reveal>}
       </div>
     </section>
